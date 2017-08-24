@@ -84,20 +84,23 @@ class File():
                 print( '> ' + ' ' * int( f ) + '^' )
                 print( '\n#####################################################################\n')
 
-                print( 'Please provide a name for this unnamed field:\n' )
+                print( 'Please provide a name for this unnamed field.' )
+                print( '(Names must consist of non-blank characters.' )
+                print( ' For any given line of data, all field names must be unique.)\n' )
                 print( '>\t' + self.structure['keys'][i][f:l] )
                 print( '>\t' + sample_data['hrules'][i][f:l] )
                 print( '>\t' + sample_data['entries'][i][f:l] + '\n' )
 
                 while True:
-                    #TODO: Make sure each name is unique.
                     name = input( '>> ' )
                     if not name or not re.search( r'\S', name ):
-                        print( 'Please enter a non-blank name.' )
-                    else: break
+                        print( '\nPlease enter a non-blank name.\n' )
+                    elif name in self.structure['field_names'][i]:
+                        print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
+                    else:
+                        break
                 self.structure['field_names'][i].append( name )
                 print( '\n' )
-
                 os.system( 'cls' if os.name == 'nt' else 'clear' )
         ''' /UI '''
 
@@ -125,13 +128,22 @@ class File():
                 names_to_map = self.structure['field_names'][index]
                 cells_to_map = self.structure['cells'][index]
 
+                # reset number of times data has been pushed under one hrule
+                c = 0
+
             if Scanner.is_data( line ):
-                # construct the data point
-                # TODO: Can't push the same set of names to the same dictionary twice without overwriting. Come up with a way to make each name unique every time multiple values are entered under one set of names.
-                this_names.extend( names_to_map )
+                if c:
+                    n2m = names_to_map
+                    n2m = [ fn + ' (' + str( c ) + ')' for fn in n2m ]
+                    this_names.extend( n2m )
+                else:
+                    this_names.extend( names_to_map )
+
                 this_data.extend( [
                     Scanner.parse( line, cell ) for cell in cells_to_map
                 ] )
+
+                c += 1 # number of times data has been pushed under one hrule
 
         print( json.dumps( self.data, indent = 2 ) )
 
