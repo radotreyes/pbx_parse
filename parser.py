@@ -1,4 +1,4 @@
-import re, os, json
+import re, os, json, openpyxl
 
 class File():
     ''' All relevant parsing guidelines, including structure, etc.
@@ -145,7 +145,7 @@ class File():
 
                 c += 1 # number of times data has been pushed under one hrule
 
-        print( json.dumps( self.data, indent = 2 ) )
+        print( json.dumps( self.data[0], indent = 2 ) )
 
 class Scanner():
     @staticmethod
