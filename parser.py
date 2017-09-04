@@ -1,4 +1,5 @@
-import re, os, json, openpyxl
+import re, os, json
+from openpyxl import Workbook
 
 class File():
     ''' All relevant parsing guidelines, including structure, etc.
@@ -10,10 +11,12 @@ class File():
         self.structure = {
             'keys': [], # verifies if a scanned line of hrules is unique
             'cells': [], # stores all hrule patterns
-            'field_names': [] # user-defined field names corresponding to patterns
+            'field_names': [], # user-defined field names corresponding to patterns
+            'set_ids': [] # list of integers corresponding 1:1 to a data pattern
         }
         self.data = {} # actually contains the data
         self.pk = r'' + re.escape( pk )
+        self.sheet = test_book.active
 
         self.set_structure()
         self.scrape()
@@ -39,7 +42,7 @@ class File():
             'entries': []
         }
 
-        point = False
+        point = False; f_id = 0
         for i, line in enumerate( self.raw ):
             if Scanner.is_pk( self.pk, line ): # upon finding the PK...
                 point = not point # we've entered or exited a data point
@@ -51,6 +54,10 @@ class File():
                 if k not in self.structure['keys']:
                     self.structure['keys'].append( k )
                     self.structure['cells'].append( c )
+                    self.structure['set_ids'].append( f_id )
+                    f_id += 1
+
+                    ''' DISPLAYED IN UI '''
                     sample_data['locs'].append( str( i ) )
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
@@ -106,19 +113,27 @@ class File():
 
     def scrape( self ):
         ''' Look for data according to self.structure and store it in 'data'. '''
-        n = -1 # data point index
+        n = -1 # member index
         for i, line in enumerate( self.raw ):
             if Scanner.is_pk( self.pk, line ):
                 # create a new data member
                 if n != -1:
                     # print( len( this_names ) )
                     # print( len( this_data ) )
-                    self.data[n] = dict( zip( this_names, this_data ) )
+                    ''' zip the previously parsed data point'''
+                    self.data[n] = member
+
+                member = {}
                 n += 1
-                this_names = []
-                this_data = []
 
             if Scanner.is_hrule( line ):
+                # push the previous data set into current member
+                try:
+                    member['**SET_ID: ' + set_key] = data_set
+                except UnboundLocalError:
+                    # set_key is undefiend or data_set is empty, continue
+                    pass
+
                 # retrieve the structure index determined by the closest key
                 for j, key in enumerate( self.structure['keys'] ):
                     if self.raw[i-1] == key:
@@ -127,25 +142,36 @@ class File():
                 # grab field data from self.structure
                 names_to_map = self.structure['field_names'][index]
                 cells_to_map = self.structure['cells'][index]
+                id_to_map = self.structure['set_ids'][index]
 
                 # reset number of times data has been pushed under one hrule
                 c = 0
 
-            if Scanner.is_data( line ):
-                if c:
-                    n2m = names_to_map
-                    n2m = [ fn + ' (' + str( c ) + ')' for fn in n2m ]
-                    this_names.extend( n2m )
-                else:
-                    this_names.extend( names_to_map )
+                # sort each set into its own dict
+                set_key = str( id_to_map )
+                data_set = {}
 
-                this_data.extend( [
+            if Scanner.is_data( line ):
+                this_names = names_to_map
+                this_data = [
                     Scanner.parse( line, cell ) for cell in cells_to_map
-                ] )
+                ]
+
+                # push data into appropriate set
+                data_set['**ENTRY#: ' + str( c )] = dict( zip( this_names, this_data ) )
 
                 c += 1 # number of times data has been pushed under one hrule
 
-        print( json.dumps( self.data[0], indent = 2 ) )
+                # print( json.dumps( data_set, indent = 2 ) )
+
+        # test_fields = self.field_names
+        print( self.structure['field_names'] )
+        test_fields = [ field for group in self.structure['field_names'] for field in group  ]
+        for i, field in enumerate( test_fields ):
+            self.sheet.cell( row = 1, column = i+1 ).value = field
+        test_book.save( 'test.xlsx' )
+        # print( json.dumps( self.data, indent = 2 ) )
+
 
 class Scanner():
     @staticmethod
@@ -180,4 +206,5 @@ class Scanner():
         ( i, j ) = cell
         return line[i:j].strip() if re.match( r'\S', line[i:j] ) else ' '
 
+test_book = Workbook()
 file_rp_all = File( 'RP_ALL.txt', 'PAD' )
