@@ -52,7 +52,7 @@ class File():
             if point and Scanner.is_hrule( line ): # if we find a horizontal rule
                 ( k, c ) = Scanner.get_pattern( self.raw, i )
 
-                ''' Store the horizontal rule pattern '''
+                # store the horizontal rule pattern
                 if k not in self.structure['keys']:
                     self.structure['keys'].append( k )
                     self.structure['cells'].append( c )
@@ -111,21 +111,29 @@ class File():
             if Scanner.is_pk( self.pk, line ):
                 # create a new data member
                 if n != -1:
-                    # print( len( this_names ) )
-                    # print( len( this_data ) )
+                    # push previous data set into current member
+                    try:
+                        member['**SET_ID: ' + set_key] = data_set
+                        if n == 0 or n == 1:
+                    except UnboundLocalError:
+                        pass # carry on in case we haven't found a data_set yet
+
                     ''' zip the previously parsed data point'''
                     self.data[n] = member
+                    if n == 0 or n == 1:
+                        print( 'Pushing member[] to self.data[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
 
                 member = {}
                 n += 1
 
             if Scanner.is_hrule( line ):
-                # push the previous data set into current member
+                # push previous data set into current member
                 try:
                     member['**SET_ID: ' + set_key] = data_set
+                    if n == 0 or n == 1:
+                        print( 'Pushing new set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                 except UnboundLocalError:
-                    # set_key is undefiend or data_set is empty, continue
-                    pass
+                    pass # carry on in case we haven't found a data_set yet
 
                 # retrieve the structure index determined by the closest key
                 for j, key in enumerate( self.structure['keys'] ):
@@ -151,19 +159,19 @@ class File():
                 ]
 
                 # push data into appropriate set
+                if n == 0 or n == 1:
+                    print( 'Pushing new entry to member[]... (MEMBER: {}, SET_ID: {}, ENTRY: {})'.format( n, set_key, c ) )
                 data_set['**ENTRY#: ' + str( c )] = dict( zip( this_names, this_data ) )
 
                 c += 1 # number of times data has been pushed under one hrule
 
     def write( self ):
-        flat_fields = []
+        flat_fields = [] # flattened list of field names for column assignment
         for group in self.structure['field_names']:
             for i, field in enumerate( group ):
                 flat_fields.append( field )
                 if i == 0:
                     self.structure['write_columns'].append( len( flat_fields ) - 1 )
-
-        # flat_fields = [ field for group in self.structure['field_names'] for field in group ]
 
         for i, field in enumerate( flat_fields ):
             self.sheet.cell( row = 1, column = i+1 ).value = field
@@ -172,16 +180,7 @@ class File():
         for i, m in enumerate( self.data ):
             current_row += Scanner.transcribe( self.data[m], self.sheet, current_row, self.structure['write_columns'] )
 
-            # print( self.data[m] )
-
         test_book.save( 'test.xlsx' )
-
-        ''' DEBUG '''
-        print( 'RAW FIELD NAMES:\n ' + str( self.structure['field_names'] ) )
-        print( 'FLATTENED:\n' + str( flat_fields ) )
-        print( 'WRITE COLUMNS:\n' + str( self.structure['write_columns'] ) )
-        print( json.dumps( self.data[0], indent = 2 ) )
-        print( json.dumps( self.data[1], indent = 2 ) )
 
 class Scanner():
     @staticmethod
@@ -218,24 +217,19 @@ class Scanner():
 
     @staticmethod
     def transcribe( member, ss, cur, wc ):
-        set_len = 1
-        for s in member:
+        set_len = 1 # rows to be reserved for this particular data set
+        for s in member: # find the number of rows required
             set_id = int( re.search( r'\d', s ).group() )
-            set_len = len( member[s] ) if len( member[s] ) > set_len else set_len # the number of rows to reserve for this set
-            # print( set_len )
+            set_len = len( member[s] ) if len( member[s] ) > set_len else set_len
+
             for e in member[s]:
                 entry_num = int( re.search( r'\d', e ).group() )
                 for i, f in enumerate( member[s][e] ):
                     # print( member[s][e][f] )
                     ss.cell( row = cur + entry_num,
                         column = wc[set_id] + i + 1 ).value = member[s][e][f]
-                # print( e )
-                # print( member[s][e] )
-            # print( s )
-            # print( re.search( r'\d', s ).group() )
 
         return set_len
-
 
 test_book = Workbook()
 file_rp_all = File( 'RP_ALL.txt', 'PAD' )
