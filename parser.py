@@ -12,7 +12,8 @@ class File():
             'keys': [], # verifies if a scanned line of hrules is unique
             'cells': [], # stores all hrule patterns
             'field_names': [], # user-defined field names corresponding to patterns
-            'set_ids': [] # list of integers corresponding 1:1 to a data pattern
+            'set_ids': [], # list of integers corresponding 1:1 to a data pattern
+            'write_columns': [], # 0-indexed STARTING INDICES of grouped field names
         }
         self.data = {} # actually contains the data
         self.pk = r'' + re.escape( pk )
@@ -20,6 +21,7 @@ class File():
 
         self.set_structure()
         self.scrape()
+        self.write()
 
     def __str__( self ):
         return 'Data file with name: ' + self.name
@@ -61,15 +63,6 @@ class File():
                     sample_data['locs'].append( str( i ) )
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
-
-        ''' DEBUG '''
-        # print( 'Largest # of data fields found between lines: ' + str( largest ) + '.' )
-        #
-        # for n, pattern in enumerate( self.structure['cells'] ):
-        #     print( self.structure['cells'][n], end='\n\n' )
-        #
-        # print( len( self.structure['cells'] ) )
-        ''' /DEBUG '''
 
         ''' UI '''
         for i, key in enumerate( self.structure['keys'] ):
@@ -162,16 +155,33 @@ class File():
 
                 c += 1 # number of times data has been pushed under one hrule
 
-                # print( json.dumps( data_set, indent = 2 ) )
+    def write( self ):
+        flat_fields = []
+        for group in self.structure['field_names']:
+            for i, field in enumerate( group ):
+                flat_fields.append( field )
+                if i == 0:
+                    self.structure['write_columns'].append( len( flat_fields ) - 1 )
 
-        # test_fields = self.field_names
-        print( self.structure['field_names'] )
-        test_fields = [ field for group in self.structure['field_names'] for field in group  ]
-        for i, field in enumerate( test_fields ):
+        # flat_fields = [ field for group in self.structure['field_names'] for field in group ]
+
+        for i, field in enumerate( flat_fields ):
             self.sheet.cell( row = 1, column = i+1 ).value = field
-        test_book.save( 'test.xlsx' )
-        # print( json.dumps( self.data, indent = 2 ) )
 
+        current_row = 2
+        for i, m in enumerate( self.data ):
+            current_row += Scanner.transcribe( self.data[m], self.sheet, current_row, self.structure['write_columns'] )
+
+            # print( self.data[m] )
+
+        test_book.save( 'test.xlsx' )
+
+        ''' DEBUG '''
+        print( 'RAW FIELD NAMES:\n ' + str( self.structure['field_names'] ) )
+        print( 'FLATTENED:\n' + str( flat_fields ) )
+        print( 'WRITE COLUMNS:\n' + str( self.structure['write_columns'] ) )
+        print( json.dumps( self.data[0], indent = 2 ) )
+        print( json.dumps( self.data[1], indent = 2 ) )
 
 class Scanner():
     @staticmethod
@@ -205,6 +215,27 @@ class Scanner():
     def parse( line, cell ):
         ( i, j ) = cell
         return line[i:j].strip() if re.match( r'\S', line[i:j] ) else ' '
+
+    @staticmethod
+    def transcribe( member, ss, cur, wc ):
+        set_len = 1
+        for s in member:
+            set_id = int( re.search( r'\d', s ).group() )
+            set_len = len( member[s] ) if len( member[s] ) > set_len else set_len # the number of rows to reserve for this set
+            # print( set_len )
+            for e in member[s]:
+                entry_num = int( re.search( r'\d', e ).group() )
+                for i, f in enumerate( member[s][e] ):
+                    # print( member[s][e][f] )
+                    ss.cell( row = cur + entry_num,
+                        column = wc[set_id] + i + 1 ).value = member[s][e][f]
+                # print( e )
+                # print( member[s][e] )
+            # print( s )
+            # print( re.search( r'\d', s ).group() )
+
+        return set_len
+
 
 test_book = Workbook()
 file_rp_all = File( 'RP_ALL.txt', 'PAD' )
