@@ -7,7 +7,9 @@ class File():
 
     def __init__( self, name, pk ):
         self.name = name
-        self.raw = self.set_raw_data() # assign raw data
+        with open( self.name ) as file:
+            self.raw = file.readlines() # assign raw data
+
         self.structure = {
             'keys': [], # verifies if a scanned line of hrules is unique
             'cells': [], # stores all hrule patterns
@@ -19,18 +21,14 @@ class File():
         self.pk = r'' + re.escape( pk )
         self.sheet = test_book.active
 
+        ''' Perform on initialization for now, but will move to user control later. '''
         self.set_structure()
         self.scrape()
         self.write()
+        ''' '''
 
     def __str__( self ):
         return 'Data file with name: ' + self.name
-
-    def set_raw_data( self ):
-        rd = None
-        with open( self.name ) as file:
-            rd = file.readlines()
-        return rd
 
     def set_structure( self ):
         ''' Assign each data field plus group names to a dict "structure".
@@ -114,7 +112,6 @@ class File():
                     # push previous data set into current member
                     try:
                         member['**SET_ID: ' + set_key] = data_set
-                        if n == 0 or n == 1:
                     except UnboundLocalError:
                         pass # carry on in case we haven't found a data_set yet
 
@@ -231,5 +228,6 @@ class Scanner():
 
         return set_len
 
+''' for use with test file '''
 test_book = Workbook()
 file_rp_all = File( 'RP_ALL.txt', 'PAD' )
