@@ -3,10 +3,10 @@ import re, os, json
 from openpyxl import Workbook
 
 class Storage():
-    ''' Handle file presets.
+    '''
+    Handle file presets.
         - All file presets are stored in the same working directory.
     '''
-
     cd = os.getcwd()
     ppath = settings.DEFAULT_PPATH # preset file path
     pname = settings.DEFAULT_PNAME # preset file name without extension
@@ -22,6 +22,9 @@ class Storage():
 
     @classmethod
     def get_pdata( cls ):
+        '''
+        Retrieve the preset data from the currently imported preset file.
+        '''
         print( 'Getting saved presets from {}.py ...'.format( cls.pname ) )
         if cls.pdata:
             print( json.dumps( cls.pdata, indent = 2 ) )
@@ -30,6 +33,10 @@ class Storage():
 
     @classmethod
     def append_pdata( cls, value ):
+        '''
+        Add a new entry to the currently imported preset file.
+        IN: _value_, the value of the preset that is to be saved.
+        '''
         while True:
             key = input( 'Please enter a name to save this preset under, or type \'exit\' to go back:\n>> ' )
             if not key or not re.search( r'\S', key ):
@@ -46,7 +53,7 @@ class Storage():
                             if w == 'y':
                                 cls.pdata[key] = value
                                 Storage.save_pdata()
-                                print( cls.pdata )
+                                print( json.dumps( cls.pdata, indent = 2 ) )
                                 return False # exit the function
                             elif w == 'n':
                                 print( 'Didn\'t overwrite.' )
@@ -56,20 +63,24 @@ class Storage():
                     # the preset doesn't already exist, so create it
                     cls.pdata[key] = value
                     Storage.save_pdata()
-                    print( cls.pdata )
+                    print( json.dumps( cls.pdata, indent = 2 ) )
                     return False # exit the function
 
     @classmethod
     def save_pdata( cls ):
+        '''
+        Save preset data class variable to the currently imported
+        preset file.
+        '''
         with open( cls.ppath, 'w' ) as f:
             f.write( settings.DEFAULT_PCONTENT )
             f.write( '{}'.format( cls.pdata ) )
 
     @classmethod
     def new_pfile( cls, name ):
-        ''' Create a new preset file. Or, if the one specified already exists, overwrite it.
-
-            - 'name' is the filename without file extension.
+        '''
+        Create or overwrite a new preset file.
+        IN: _name_, preset filename excluding extension.
         '''
         # define the file path
         path = os.path.join( cls.cd, '{}.py'.format( name ) )
@@ -102,7 +113,6 @@ class Storage():
     @classmethod
     def load_pfile( cls ):
         ''' Load preset data from an existing file. '''
-
         # change the current preset data
         presets = __import__( cls.pname )
         cls.pdata = presets.data
@@ -111,8 +121,10 @@ class Storage():
 
     @classmethod
     def change_pfile( cls, name ):
-        ''' Load another preset file based on user input. '''
-
+        '''
+        Load another preset file based on user input.
+        IN: _name_, preset filename excluding extension.
+        '''
         # define the file path
         path = os.path.join( cls.cd, '{}.py'.format( name ) )
 
@@ -129,8 +141,10 @@ class Storage():
         print( 'Changed presets file to {}.py.'.format( name ) )
 
 class File():
-    ''' All relevant parsing guidelines, including structure, etc.
-        are set on initialization '''
+    '''
+    All relevant parsing guidelines, including structure, etc.
+    are set on initialization.
+    '''
 
     def __init__( self, name, pk ):
         self.name = name
@@ -138,17 +152,19 @@ class File():
             self.raw = file.readlines() # assign raw data
 
         self.structure = {
-            'keys': [], # verifies if a scanned line of hrules is unique
-            'cells': [], # stores all hrule patterns
-            'field_names': [], # user-defined field names corresponding to patterns
-            'set_ids': [], # list of integers corresponding 1:1 to a data pattern
-            'write_columns': [], # 0-indexed STARTING INDICES of grouped field names
+            'keys': [], # contains the line of data above each horizontal rule
+                        # used to verify uniqueness of each hrule pattern
+            'cells': [], # unique horizontal rule patterns in the file
+            'fix': [], # specifies if fields need to be align-fixed
+            'field_names': [], # user-defined field names
+            'set_ids': [], # integers corresponding 1:1 to a data pattern
+            'write_columns': [], # starting indices of grouped field names, 0ind
         }
         self.data = {} # actually contains the data
         self.pk = r'' + re.escape( pk )
         self.sheet = test_book.active
 
-        ''' Perform on initialization for now, but will move to user control later. '''
+        ''' Perform on initialization for now, will move to user control later. '''
         self.set_structure()
         self.scrape()
         self.write()
@@ -158,10 +174,12 @@ class File():
         return 'Data file with name: ' + self.name
 
     def set_structure( self ):
-        ''' Assign each data field plus group names to a dict "structure".
-            Use the pattern of the horizontal rules
+        '''
+        - Assign each data field plus group names to a dict "structure".
+        - Use the pattern of the horizontal rules
             PLUS the line immediately above each line of horizontal rules
-            to uniquely identify each row of data. '''
+            to uniquely identify each row of data.
+        '''
 
         sample_data = {
             'locs': [],
@@ -182,12 +200,26 @@ class File():
                     self.structure['keys'].append( k )
                     self.structure['cells'].append( c )
                     self.structure['set_ids'].append( f_id )
+
+                    # does the data need to be align-fixed?
+                    if Scanner.is_data( self.raw[i+1] ):
+                        print( 'Found data' )
+                        print( self.raw[i+1][2:] )
+                        print( 'Next line:' )
+                        print( self.raw[i+2] )
+                        if re.search( self.raw[i+1][2:].strip(), self.raw[i+2] ):
+                            self.structure['fix'].append( True )
+                        else:
+                            self.structure['fix'].append( False )
+
                     f_id += 1
 
                     ''' DISPLAYED IN UI '''
                     sample_data['locs'].append( str( i ) )
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
+
+        print( json.dumps( self.structure, indent = 2) )
 
         ''' UI '''
         for i, key in enumerate( self.structure['keys'] ):
@@ -230,7 +262,9 @@ class File():
         ''' /UI '''
 
     def scrape( self ):
-        ''' Look for data according to self.structure and store it in 'data'. '''
+        '''
+        Look for data according to self.structure and store it in _self.data_.
+        '''
         n = -1 # member index
         for i, line in enumerate( self.raw ):
             if Scanner.is_pk( self.pk, line ):
@@ -268,6 +302,7 @@ class File():
                 names_to_map = self.structure['field_names'][index]
                 cells_to_map = self.structure['cells'][index]
                 id_to_map = self.structure['set_ids'][index]
+                fix_to_map = self.structure['fix'][index]
 
                 # reset number of times data has been pushed under one hrule
                 c = 0
@@ -278,9 +313,22 @@ class File():
 
             if Scanner.is_data( line ):
                 this_names = names_to_map
-                this_data = [
-                    Scanner.parse( line, cell ) for cell in cells_to_map
-                ]
+
+                if fix_to_map:
+                    '''
+                    This path applies an ALIGN-FIX.
+                        - Instead of parsing the line the data is on,
+                            parse the next line shifted by 2.
+                        - Sometimes necessary in faulty Siemens PBX
+                            output files.
+                    '''
+                    this_data = [
+                        Scanner.parse( 'DS' + self.raw[i+1], cell ) for cell in cells_to_map
+                    ]
+                else:
+                    this_data = [
+                        Scanner.parse( line, cell ) for cell in cells_to_map
+                    ]
 
                 # push data into appropriate set
                 if n == 0 or n == 1:
@@ -290,6 +338,9 @@ class File():
                 c += 1 # number of times data has been pushed under one hrule
 
     def write( self ):
+        '''
+        Write the file to Excel.
+        '''
         flat_fields = [] # flattened list of field names for column assignment
         for group in self.structure['field_names']:
             for i, field in enumerate( group ):
@@ -314,12 +365,22 @@ class Scanner():
 
     @staticmethod
     def is_pk( pk, line ):
+        '''
+        Searches for a primary key in the given line.
+        IN: _pk_, primary key to look for
+            _line_, line to search in
+        '''
         return re.search( pk, line )
 
     @staticmethod
-    def get_pattern( content, index ):
-        p = re.finditer( r'-+', content[index] )
-        this_key = content[index - 1]
+    def get_pattern( hrule_line, index ):
+        '''
+        Grabs the horizontal rule pattern from the appropriate line.
+        IN: _hrule_line_, a line a hrule pattern
+            _index_, the index of that line
+        '''
+        p = re.finditer( r'-+', hrule_line[index] )
+        this_key = hrule_line[index - 1]
         this_pattern = []
 
         while True:
@@ -331,16 +392,32 @@ class Scanner():
 
     @staticmethod
     def is_data( line ):
-        ''' if "DS" is present at the start of a line, then that line contains data'''
+        '''
+        If "DS" is present at the start of a line, then that line contains data
+        IN: _line_, the line to scan
+        '''
         return re.match( r'^DS', line )
 
     @staticmethod
     def parse( line, cell ):
+        '''
+        Grabs data from a line according to its data structure,
+        which is defined in _FileObject.structure_
+        IN: _line_, the line to scan
+            _cell_, the coordinate span of _line_ which contains data
+        '''
         ( i, j ) = cell
         return line[i:j].strip() if re.match( r'\S', line[i:j] ) else ' '
 
     @staticmethod
     def transcribe( member, ss, cur, wc ):
+        '''
+        Writes data to Excel.
+        IN: _member_, the data member which is being transcribed
+            _ss_, the spreadsheet to write to
+            _cur_, the current row number which should be written to
+            _wc_, write column; the column number which should be written to
+        '''
         set_len = 1 # rows to be reserved for this particular data set
         for s in member: # find the number of rows required
             set_id = int( re.search( r'\d', s ).group() )
@@ -356,11 +433,11 @@ class Scanner():
         return set_len
 
 ''' for use with test file '''
-# test_book = Workbook()
-# file_rp_all = File( 'RP_ALL.txt', 'PAD' )
+test_book = Workbook()
+file_rp_all = File( 'SLI.txt', 'PAD' )
 
 ''' testing presets '''
-Storage.load_pfile()
-Storage.change_pfile( 'poop' )
-Storage.get_pdata()
-Storage.append_pdata( 'pants' )
+# Storage.load_pfile()
+# Storage.change_pfile( 'poop' )
+# Storage.get_pdata()
+# Storage.append_pdata( 'test' )
