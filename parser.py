@@ -1,4 +1,6 @@
-import settings, savedata
+import settings
+from savedata import Presets
+
 import re, os, json
 from openpyxl import Workbook
 from openpyxl.styles import Font, Color, PatternFill
@@ -76,25 +78,46 @@ class Record():
 
         input( '\nParsing record ' + name + '.' )
 
-        # Metadata
-        self.meta = {
-            'name': name,
-            'pk': None,
-            'pk_inline': False, # if the PK contains an inline data point
-            'command': command
-        }
-        self.set_meta()
+        ''' LOADING PRESETS '''
+        if Presets.pdata:
+            while True:
+                print( 'You have saved presets.' )
+                print( 'Would you like to load a preset for this file? (Y/N)' )
+                use = input( '>> ' ).lower()
+                if use == 'y':
+                    pdata = Presets.get_pdata()
+                    self.meta = pdata['meta']
+                    self.structure = pdata['structure']
+                    self.presets = True
+                    break
+                elif use == 'n':
+                    self.presets = False
+                    break
+                else:
+                    print( 'Please enter a valid input.' )
+        else:
+            self.presets = False
 
-        self.structure = {
-            'keys': [], # contains the line of data above each horizontal rule
-                        # used to verify uniqueness of each hrule pattern
-            'cells': [], # unique horizontal rule patterns in the file
-            'fix': [], # specifies if fields need to be align-fixed
-            'field_names': [], # user-defined field names
-            'set_ids': [], # integers corresponding 1:1 to a data pattern
-            'write_columns': [], # starting indices of grouped field names, 0ind
-        }
-        self.set_structure()
+        if not self.presets:
+            # Metadata
+            self.meta = {
+                'name': name,
+                'pk': None,
+                'pk_inline': False, # if the PK contains an inline data point
+                'command': command
+            }
+            self.set_meta()
+
+            self.structure = {
+                'keys': [], # contains the line of data above each horizontal rule
+                            # used to verify uniqueness of each hrule pattern
+                'cells': [], # unique horizontal rule patterns in the file
+                'fix': [], # specifies if fields need to be align-fixed
+                'field_names': [], # user-defined field names
+                'set_ids': [], # integers corresponding 1:1 to a data pattern
+                'write_columns': [], # starting indices of grouped field names, 0ind
+            }
+            self.set_structure()
 
         # Data object and output worksheet
         self.data = {} # actually contains the data
@@ -191,58 +214,72 @@ class Record():
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
 
-        ''' UI '''
-        print( self.structure['cells'][0] )
-        input( self.structure['cells'][1] )
+        if not self.presets:
+            ''' UI '''
+            os.system( 'cls' if os.name == 'nt' else 'clear' )
+
+            x = offset = 0 # offset index, to be used if pk_inline is True
+            for i, key in enumerate( self.structure['keys'] ):
+                x = i + offset
+
+                self.structure['field_names'].append( [] )
+
+                for j, cell in enumerate( self.structure['cells'][i] ):
+                    if key != 'PRIMARY KEY':
+                        print( 'All fields must be named to properly store data from this raw file.' )
+                        print( 'Please provide names for each field in the file "' + self.meta['name'] + '".' )
+                        print( 'Example data is shown below.\n' )
+                        print( '(If necessary, please browse through the raw file to determine appropriate names.)\n' )
+
+                        ( f, l ) = cell
+
+                        print( '#####################################################################\n')
+                        print( 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n' )
+                        print( '> ' + key, end = '' )
+                        print( '> ' + sample_data['hrules'][x], end = '' )
+                        print( '> ' + sample_data['entries'][x], end = '' )
+                        print( '> ' + ' ' * int( f ) + '^' )
+                        print( '\n#####################################################################\n')
+
+                        print( 'Please provide a name for this unnamed field.' )
+                        print( '(Names must consist of non-blank characters.' )
+                        print( ' For any given line of data, all field names must be unique.)\n' )
+                        print( '>\t' + self.structure['keys'][i][f:l] )
+                        print( '>\t' + sample_data['hrules'][x][f:l] )
+                        print( '>\t' + sample_data['entries'][x][f:l] + '\n' )
+
+                        while True:
+                            name = input( '>> ' )
+                            if not name or not re.search( r'\S', name ):
+                                print( '\nPlease enter a non-blank name.\n' )
+                            elif name in self.structure['field_names'][i]:
+                                print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
+                            else:
+                                break
+                    else:
+                        name = self.meta['pk']
+                        offset -= 1
+
+                    self.structure['field_names'][i].append( name )
+                    print( '\n' )
+                    os.system( 'cls' if os.name == 'nt' else 'clear' )
+            ''' /UI '''
+
+        ''' SAVING PRESETS '''
+        while True:
+            print( 'Save your entries as a new preset? (Y/N)')
+            save = input( '>> ' ).lower()
+            if save == 'y':
+                Presets.append_pdata( self.meta, self.structure )
+                Presets.save_pdata()
+                break
+            elif save == 'n' :
+                break
+            else:
+                print( 'Please enter a valid input.' )
+
         os.system( 'cls' if os.name == 'nt' else 'clear' )
 
-        x = offset = 0 # offset index, to be used if pk_inline is True
-        for i, key in enumerate( self.structure['keys'] ):
-            x = i + offset
-
-            print( i )
-            self.structure['field_names'].append( [] )
-
-            for j, cell in enumerate( self.structure['cells'][i] ):
-                if key != 'PRIMARY KEY':
-                    print( 'All fields must be named to properly store data from this raw file.' )
-                    print( 'Please provide names for each field in the file "' + self.meta['name'] + '".' )
-                    print( 'Example data is shown below.\n' )
-                    print( '(If necessary, please browse through the raw file to determine appropriate names.)\n' )
-
-                    ( f, l ) = cell
-
-                    print( '#####################################################################\n')
-                    print( 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n' )
-                    print( '> ' + key, end = '' )
-                    print( '> ' + sample_data['hrules'][x], end = '' )
-                    print( '> ' + sample_data['entries'][x], end = '' )
-                    print( '> ' + ' ' * int( f ) + '^' )
-                    print( '\n#####################################################################\n')
-
-                    print( 'Please provide a name for this unnamed field.' )
-                    print( '(Names must consist of non-blank characters.' )
-                    print( ' For any given line of data, all field names must be unique.)\n' )
-                    print( '>\t' + self.structure['keys'][i][f:l] )
-                    print( '>\t' + sample_data['hrules'][x][f:l] )
-                    print( '>\t' + sample_data['entries'][x][f:l] + '\n' )
-
-                    while True:
-                        name = input( '>> ' )
-                        if not name or not re.search( r'\S', name ):
-                            print( '\nPlease enter a non-blank name.\n' )
-                        elif name in self.structure['field_names'][i]:
-                            print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
-                        else:
-                            break
-                else:
-                    name = self.meta['pk']
-                    offset -= 1
-
-                self.structure['field_names'][i].append( name )
-                print( '\n' )
-                os.system( 'cls' if os.name == 'nt' else 'clear' )
-        ''' /UI '''
 
     def scrape( self ):
         '''
@@ -464,12 +501,9 @@ class Scanner():
 
         return set_len
 
+''' testing presets '''
+Presets.load_pfile()
+
 ''' for use with test file '''
 test_book = Workbook()
 file_rp_all = RawFile( 'SERVICE_LIST.TXT' )
-
-''' testing presets '''
-# Storage.load_pfile()
-# Storage.change_pfile( 'poop' )
-# Storage.get_pdata()
-# Storage.append_pdata( 'test' )
