@@ -7,7 +7,6 @@ COMMAND: [command]
 
 	NORMAL:
 
-	- ACD_G (PK: ACDGROUP NODE) (Command: LI ACD_G ALL)
 	- ATC (PK: PAD) (Command: LI ATC ALL)
 	- ATC_G (PK: GROUP NUMBER) (Command: LI ATC_G ALL)
 	- COM_GROUP (PK: COM GROUP) (Command: LI COM_G ALL)
@@ -25,6 +24,9 @@ COMMAND: [command]
 
 	- SLI (PK: PAD) (Command: LI SLI ALL)
 	- TRUNK_GROUPS (PK: GENERAL ATTRIBUTES (1)) (Command: LI TRUNK_GROUP ALL)
+
+	MULTIPLE COMMANDS:
+	- ACD_G (PK: ACDGROUP NODE) (Command: LI ACD_G ALL)
 
 	
 # Files that almost work:
