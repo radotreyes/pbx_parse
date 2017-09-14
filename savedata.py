@@ -103,12 +103,29 @@ class Presets():
         '''
         print( 'Getting saved presets from {}.py ...'.format( cls.pname ) )
         if cls.pdata:
-            print( json.dumps( cls.pdata, indent = 2 ) )
+            print( 'Found these presets.' )
+            for preset in cls.pdata:
+                print( preset )
+
+            while True:
+                key = input( 'Which preset do you want to load?\n>> ' )
+                print( 'Type \'exit\' to abort.' )
+                if not key or not re.search( r'\S', key ):
+                    print( 'Please enter a valid name.' )
+                elif key.lower() == 'exit':
+                    return False
+                else:
+                    try:
+                        if cls.pdata[key]:
+                            return cls.pdata[key]
+                    except KeyError:
+                        print( 'That preset doesn\'t exist!' )
         else:
             print( 'There are no presets here!' )
+            return False
 
     @classmethod
-    def append_pdata( cls, value ):
+    def append_pdata( cls, meta, structure ):
         '''
         Add a new entry to the currently imported preset file.
         IN: _value_, the value of the preset that is to be saved.
@@ -127,7 +144,8 @@ class Presets():
                             print( 'There is already a preset with this name. Do you want to overwrite it? (Y/N)' )
                             w = input( '>> ').lower()
                             if w == 'y':
-                                cls.pdata[key] = value
+                                cls.pdata[key]['meta'] = meta
+                                cls.pdata[key]['structure'] = structure
                                 Presets.save_pdata()
                                 print( json.dumps( cls.pdata, indent = 2 ) )
                                 return False # exit the function
@@ -137,9 +155,10 @@ class Presets():
                             print( '\nPlease enter a valid input.\n' )
                 except KeyError:
                     # the preset doesn't already exist, so create it
-                    cls.pdata[key] = value
+                    cls.pdata[key] = {}
+                    cls.pdata[key]['meta'] = meta
+                    cls.pdata[key]['structure'] = structure
                     Presets.save_pdata()
-                    print( json.dumps( cls.pdata, indent = 2 ) )
                     return False # exit the function
 
     @classmethod
@@ -151,3 +170,8 @@ class Presets():
         with open( cls.ppath, 'w' ) as f:
             f.write( settings.DEFAULT_PCONTENT )
             f.write( '{}'.format( cls.pdata ) )
+
+if __name__ == '__main__':
+    Presets.load_pfile()
+    print( Presets.ppath )
+    print( Presets.pdata )
