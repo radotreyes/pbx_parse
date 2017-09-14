@@ -3,23 +3,85 @@ import re, os, json
 from openpyxl import Workbook
 from openpyxl.styles import Font, Color, PatternFill
 
-class File():
+class RawFile():
+    def __init__( self, path ):
+        self.name = path.split( '.' )[0]
+
+        with open( path ) as file:
+            self.content = file.readlines()
+
+        self.records = self.get_records()
+
+        print( 'Found {} records in this file:'.format( len( self.records ) ) )
+        if self.records:
+            for key, value in self.records.items():
+                print( '\tRecord "{}" with length {}'.format( key, len( value ) ) )
+
+                self.process_record( key, value )
+
+    def get_records( self ):
+        '''
+        Scans raw file content and separates data records by looking for the string "COMMAND: LI". Data records are saved to _self.records_.
+        '''
+        records = {}; cache = []
+        found = False; num = 0
+        for i, line in enumerate( self.content ):
+            # scan for EOF
+            try:
+                nextline = self.content[i+1]
+            except IndexError:
+                nextline = None
+
+            # if we find a PBX command
+            if re.search( r'^COMMAND: LI \w+', line ):
+                # indicate that we have found a record
+                found = True
+
+                # if any data is currently cached
+                if cache:
+                    # save it to record list
+                    key = self.name + '({})'.format( num ) if num else self.name
+                    records[key] = cache
+                    num += 1 # increment record number
+                    cache = [] # clear cache
+
+            # while in a record, save lines to cache
+            if found:
+                cache.append( line )
+
+            # we've reached EOF, save cache to record list
+            if not nextline:
+                key = self.name + '({})'.format( num ) if num else self.name
+                records[key] = cache
+
+        return records
+
+    def process_record( self, name, rawdata ):
+        # parses the command associated with this data record
+        cmd = rawdata[0].split( 'COMMAND:' )[1].split( '\n' )[0]
+
+        # creates a new Record object from this data record
+        test_record = Record( name, rawdata, cmd )
+
+
+class Record():
     '''
-    All relevant parsing guidelines, including structure, etc.
+    Data contained in a RawFile, as separated by a "COMMAND: LI". All relevant parsing guidelines, including structure, etc.
     are set on initialization.
     '''
 
-    def __init__( self, name ):
+    def __init__( self, name, rawdata, command ):
         # Open file
-        with open( name ) as file:
-            self.raw = file.readlines() # assign raw data
+        self.raw = rawdata
+
+        input( '\nParsing record ' + name + '.' )
 
         # Metadata
         self.meta = {
             'name': name,
             'pk': None,
             'pk_inline': False, # if the PK contains an inline data point
-            'command': None
+            'command': command
         }
         self.set_meta()
 
@@ -59,14 +121,6 @@ class File():
         self.meta['pk'] = r'' + re.escape( pk )
 
         os.system( 'cls' if os.name == 'nt' else 'clear' )
-        print( 'Please enter the Siemens PBX command associated with this data set.' )
-        while True:
-            cmd = input( '>> ' )
-            if not cmd or not re.search( r'\S', cmd ):
-                print( '\nPlease enter a non-blank name.\n' )
-            else:
-                break
-        self.meta['command'] = r'' + re.escape( cmd )
 
     def set_structure( self ):
         '''
@@ -412,7 +466,7 @@ class Scanner():
 
 ''' for use with test file '''
 test_book = Workbook()
-file_rp_all = File( 'SERVICE_LIST.TXT' )
+file_rp_all = RawFile( 'SERVICE_LIST.TXT' )
 
 ''' testing presets '''
 # Storage.load_pfile()
