@@ -14,7 +14,7 @@ Handles storage of user data, including:
 import settings
 import re, os, json
 
-class Storage():
+class Presets():
     '''
     Handle file presets.
         - All file presets are stored in the same working directory.
@@ -64,7 +64,7 @@ class Storage():
             f.write( settings.DEFAULT_PDATA )
 
         # load the new preset data
-        Storage.load_pfile()
+        Presets.load_pfile()
 
     @classmethod
     def load_pfile( cls ):
@@ -87,12 +87,12 @@ class Storage():
         if not os.path.isfile( path ):
             # create the file if it doesn't exist
             print( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
-            Storage.new_pfile( name )
+            Presets.new_pfile( name )
         else:
             # change the file path and load data
             cls.ppath = os.path.join( cls.cd, '{}.py'.format( name ) )
             cls.pname = name
-            Storage.load_pfile()
+            Presets.load_pfile()
 
         print( 'Changed presets file to {}.py.'.format( name ) )
 
@@ -128,7 +128,7 @@ class Storage():
                             w = input( '>> ').lower()
                             if w == 'y':
                                 cls.pdata[key] = value
-                                Storage.save_pdata()
+                                Presets.save_pdata()
                                 print( json.dumps( cls.pdata, indent = 2 ) )
                                 return False # exit the function
                             elif w == 'n':
@@ -138,7 +138,7 @@ class Storage():
                 except KeyError:
                     # the preset doesn't already exist, so create it
                     cls.pdata[key] = value
-                    Storage.save_pdata()
+                    Presets.save_pdata()
                     print( json.dumps( cls.pdata, indent = 2 ) )
                     return False # exit the function
 

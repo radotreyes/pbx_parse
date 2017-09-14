@@ -43,9 +43,6 @@ with open( 'RP_ALL.txt' ) as file:
                 # starts at -1 so that when a member is found, iteration starts at 0
     pk = r'PAD' # DEBUG: id that signifies a new data member
     group_keys = []
-    '''
-    TODO: instead of comparing length of group_keys to the current group, actually store the hrule pattern. declare data_map globally. this avoids unexpected non-sequential new groups screwing up data storage
-    '''
 
     for i, line in enumerate( content ):
         ''' Scope is the line being scanned '''
@@ -61,7 +58,7 @@ with open( 'RP_ALL.txt' ) as file:
                     # get positions of the headers
                     data_map = []
                     hrule_iter = re.finditer( r'-+', line )
-                    while True :
+                    while( True ):
                         try:
                             data_map.append( next( hrule_iter ).span() )
                         except StopIteration:
@@ -77,7 +74,7 @@ with open( 'RP_ALL.txt' ) as file:
                     n += 1
                 else: # continue this until no more data is found
                     break
-            # break # DEBUG
+            break # DEBUG
 
     print( json.dumps( data[0], indent=2 ) )
-    print( len( group_keys ) )
+    print( group_keys )
