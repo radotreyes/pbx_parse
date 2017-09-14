@@ -1,0 +1,94 @@
+# Different DATA EXTRACTION SETS are separated by
+COMMAND: [command]
+
+- If COMMAND: isn't followed by anything then ignore it.
+
+# Files that work with the current model:
+
+	NORMAL:
+
+	- ACD_G (PK: ACDGROUP NODE) (Command: LI ACD_G ALL)
+	- ATC (PK: PAD) (Command: LI ATC ALL)
+	- ATC_G (PK: GROUP NUMBER) (Command: LI ATC_G ALL)
+	- COM_GROUP (PK: COM GROUP) (Command: LI COM_G ALL)
+	- EXPECTED_DIGITS (PK: TABLE) (Command: LI EXPECTED_DIGITS ALL)
+	- EXTEN (PK: EXTN) (Command: LI EXTEN ALL)
+	- HUNT_GROUP (PK: PILOT) (Command: LI HD ALL)
+	- RP_ALL (PK: PAD) (Command: LI RP ALL)
+	- SPECIAL_DIGITS (PK: TABLE) (Command: LI SPECIAL_DIGITS ALL)
+	- SPEED (PK: INDEX) (Command: LI SPEED ALL)
+	- TRUNK_ACCESS (PK: ACCESS) (Command: LI TRUNK_ACCESS ALL)
+	- TRUNK_ALL (PK: PAD) (Command: LI TRUNK ALL)
+	- TEN_DIGIT (PK: AREA) (Command: LI TEN_DIGIT ALL)
+
+	"ALIGN-FIXED":
+
+	- SLI (PK: PAD) (Command: LI SLI ALL)
+	- TRUNK_GROUPS (PK: GENERAL ATTRIBUTES (1)) (Command: LI TRUNK_GROUP ALL)
+
+	
+# Files that almost work:
+	- ROUTE_LISTS (PK: ROUTE LIST NAME) (Command: LI ROUTE_LIST ALL)
+		(need to include data from PK)
+	- SERVICE_LIST (PK: SERVICE AREA NAME) (Command: LI SERVICE_LIST ALL)
+		(need to include data from PK)
+
+# Files that don't work, and adjustments:
+	- CALLPROCESSING (PK: Mailbox Extn) (No command, completely different format)
+
+
+## DATA SHIFTED DOWN PATTERNS:
+	- Data is shifted DOWN one line and LEFT two columns.
+	- Apply an alignment fix to specified fields.
+
+############
+
+self.data
+---------
+{ 
+	MEMBER: 
+	{ 
+		"**SET_ID:" num:
+		{
+			"**ENTRY#:" num: 
+			{
+				"field1": value
+				"field2": value
+				...
+			}
+		}
+	}
+}
+
+SPREADSHEET:
+------------
+R1 -> fields
+R2 -> first set
+R3 -> second set
+.
+.
+.
+Rn -> nth set
+
+
+IDENTIFYING BY FIELDS:
+----------------------
+field_names (nested list) = [
+	[field1],
+	[field2],
+	.
+	.
+	.
+}
+
+
+``` WRITING TO SPREADSHEET ```
+1. _FOREACH_ set, 
+	a. count the size, _len()_, of each member and reserve that number of rows in the spreadsheet.
+	b. assign each field in the entry to an appropriate column.
+
+```
+
+##########
+9/7: Works as intended, but sets are being pushed to the next member[] for some reason. probably an issue where data is being pushed to member[] early, and/or member[] is not being cleared before pushing a new data set to it.
+				
