@@ -1,144 +1,7 @@
-import settings
+import settings, savedata
 import re, os, json
 from openpyxl import Workbook
-
-class Storage():
-    '''
-    Handle file presets.
-        - All file presets are stored in the same working directory.
-    '''
-    cd = os.getcwd()
-    ppath = settings.DEFAULT_PPATH # preset file path
-    pname = settings.DEFAULT_PNAME # preset file name without extension
-    pdata = None
-
-    # DEFAULT PROCEDURE
-    # creset preset file if it doesn't exist
-    if not os.path.isfile( ppath ):
-        with open( ppath, 'w' ) as f:
-            # create an empty data object
-            f.write( settings.DEFAULT_PCONTENT )
-            f.write( settings.DEFAULT_PDATA )
-
-    @classmethod
-    def get_pdata( cls ):
-        '''
-        Retrieve the preset data from the currently imported preset file.
-        '''
-        print( 'Getting saved presets from {}.py ...'.format( cls.pname ) )
-        if cls.pdata:
-            print( json.dumps( cls.pdata, indent = 2 ) )
-        else:
-            print( 'There are no presets here!' )
-
-    @classmethod
-    def append_pdata( cls, value ):
-        '''
-        Add a new entry to the currently imported preset file.
-        IN: _value_, the value of the preset that is to be saved.
-        '''
-        while True:
-            key = input( 'Please enter a name to save this preset under, or type \'exit\' to go back:\n>> ' )
-            if not key or not re.search( r'\S', key ):
-                print( '\nPlease enter a non-blank name.\n' )
-            elif key.lower() == 'exit':
-                return False # exit the function
-            else:
-                try:
-                    # see if the preset already exists
-                    if cls.pdata[key]:
-                        while True:
-                            print( 'There is already a preset with this name. Do you want to overwrite it? (Y/N)' )
-                            w = input( '>> ').lower()
-                            if w == 'y':
-                                cls.pdata[key] = value
-                                Storage.save_pdata()
-                                print( json.dumps( cls.pdata, indent = 2 ) )
-                                return False # exit the function
-                            elif w == 'n':
-                                print( 'Didn\'t overwrite.' )
-                                break
-                            print( '\nPlease enter a valid input.\n' )
-                except KeyError:
-                    # the preset doesn't already exist, so create it
-                    cls.pdata[key] = value
-                    Storage.save_pdata()
-                    print( json.dumps( cls.pdata, indent = 2 ) )
-                    return False # exit the function
-
-    @classmethod
-    def save_pdata( cls ):
-        '''
-        Save preset data class variable to the currently imported
-        preset file.
-        '''
-        with open( cls.ppath, 'w' ) as f:
-            f.write( settings.DEFAULT_PCONTENT )
-            f.write( '{}'.format( cls.pdata ) )
-
-    @classmethod
-    def new_pfile( cls, name ):
-        '''
-        Create or overwrite a new preset file.
-        IN: _name_, preset filename excluding extension.
-        '''
-        # define the file path
-        path = os.path.join( cls.cd, '{}.py'.format( name ) )
-
-        # If the file exists, confirm if the user wants to overwrite
-        if os.path.isfile( path ):
-            while True:
-                print( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
-                w = input( '>> ' ).lower()
-                if w == 'y':
-                    print( 'Overwriting...' )
-                    break
-                elif w == 'n':
-                    print( 'Didn\'t overwrite.' )
-                    return False # stop trying to create a new file
-                print( '\nPlease enter a valid input.\n' )
-
-        # change the current preset file path
-        cls.ppath = path
-        cls.pname = name
-
-        # create the new preset file
-        with open( path, 'w' ) as f:
-            f.write( settings.DEFAULT_PCONTENT )
-            f.write( settings.DEFAULT_PDATA )
-
-        # load the new preset data
-        Storage.load_pfile()
-
-    @classmethod
-    def load_pfile( cls ):
-        ''' Load preset data from an existing file. '''
-        # change the current preset data
-        presets = __import__( cls.pname )
-        cls.pdata = presets.data
-
-        print( 'Loading presets from {} ...'.format( cls.ppath ) )
-
-    @classmethod
-    def change_pfile( cls, name ):
-        '''
-        Load another preset file based on user input.
-        IN: _name_, preset filename excluding extension.
-        '''
-        # define the file path
-        path = os.path.join( cls.cd, '{}.py'.format( name ) )
-
-        if not os.path.isfile( path ):
-            # create the file if it doesn't exist
-            print( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
-            Storage.new_pfile( name )
-        else:
-            # change the file path and load data
-            cls.ppath = os.path.join( cls.cd, '{}.py'.format( name ) )
-            cls.pname = name
-            Storage.load_pfile()
-
-        print( 'Changed presets file to {}.py.'.format( name ) )
+from openpyxl.styles import Font, Color, PatternFill
 
 class File():
     '''
@@ -146,10 +9,19 @@ class File():
     are set on initialization.
     '''
 
-    def __init__( self, name, pk ):
-        self.name = name
-        with open( self.name ) as file:
+    def __init__( self, name ):
+        # Open file
+        with open( name ) as file:
             self.raw = file.readlines() # assign raw data
+
+        # Metadata
+        self.meta = {
+            'name': name,
+            'pk': None,
+            'pk_inline': False, # if the PK contains an inline data point
+            'command': None
+        }
+        self.set_meta()
 
         self.structure = {
             'keys': [], # contains the line of data above each horizontal rule
@@ -160,18 +32,41 @@ class File():
             'set_ids': [], # integers corresponding 1:1 to a data pattern
             'write_columns': [], # starting indices of grouped field names, 0ind
         }
+        self.set_structure()
+
+        # Data object and output worksheet
         self.data = {} # actually contains the data
-        self.pk = r'' + re.escape( pk )
         self.sheet = test_book.active
 
-        ''' Perform on initialization for now, will move to user control later. '''
-        self.set_structure()
+        # Read the file and output to Excel
+        # TODO: Move to user control
         self.scrape()
         self.write()
         ''' '''
 
     def __str__( self ):
         return 'Data file with name: ' + self.name
+
+    def set_meta( self ):
+        os.system( 'cls' if os.name == 'nt' else 'clear' )
+        print( 'Please enter the primary key for this data set.' )
+        while True:
+            pk = input( '>> ' )
+            if not pk or not re.search( r'\S', pk ):
+                print( '\nPlease enter a non-blank name.\n' )
+            else:
+                break
+        self.meta['pk'] = r'' + re.escape( pk )
+
+        os.system( 'cls' if os.name == 'nt' else 'clear' )
+        print( 'Please enter the Siemens PBX command associated with this data set.' )
+        while True:
+            cmd = input( '>> ' )
+            if not cmd or not re.search( r'\S', cmd ):
+                print( '\nPlease enter a non-blank name.\n' )
+            else:
+                break
+        self.meta['command'] = r'' + re.escape( cmd )
 
     def set_structure( self ):
         '''
@@ -189,24 +84,47 @@ class File():
 
         point = False; f_id = 0
         for i, line in enumerate( self.raw ):
-            if Scanner.is_pk( self.pk, line ): # upon finding the PK...
+            try:
+                nextline = self.raw[i+1]
+            except IndexError:
+                nextline = None
+
+            if Scanner.is_pk( self.meta['pk'], line ): # upon finding the PK...
                 point = not point # we've entered or exited a data point
 
-            if point and Scanner.is_hrule( line ): # if we find a horizontal rule
+                # If the PK contains a colon, then include the text after that colon as a data point
+                if re.search( r':', line ) and not self.meta['pk_inline']:
+                    self.structure['keys'].append( 'PRIMARY KEY' )
+                    self.structure['cells'].append( [ (
+                        len( line.split( ':' )[0] ) + 1,
+                        len( line ) - 1
+                    ), ] )
+                    self.structure['set_ids'].append( f_id )
+                    self.structure['fix'].append( False )
+                    self.meta['pk_inline'] = True
+                    # print( self.structure['cells'][0] )
+                    # input( type( self.structure['cells'][0] ) )
+                    f_id += 1
+
+            if point and Scanner.is_hrule( line, nextline ): # if we find a horizontal rule
                 ( k, c ) = Scanner.get_pattern( self.raw, i )
 
                 # store the horizontal rule pattern
                 if k not in self.structure['keys']:
+                    # input( 'Appending {} on line {}'.format( c, i ) )
                     self.structure['keys'].append( k )
                     self.structure['cells'].append( c )
                     self.structure['set_ids'].append( f_id )
 
                     # does the data need to be align-fixed?
                     if Scanner.is_data( self.raw[i+1] ):
-                        print( 'Found data' )
-                        print( self.raw[i+1][2:] )
-                        print( 'Next line:' )
-                        print( self.raw[i+2] )
+                        '''
+                        Data can sometimes be shifted one line down.
+                        If this happens, an align-fix is needed.
+                        If an align-fix is needed, data will be parsed from
+                        the next line down, rather than the line that the data
+                        is normally on.
+                        '''
                         if re.search( self.raw[i+1][2:].strip(), self.raw[i+2] ):
                             self.structure['fix'].append( True )
                         else:
@@ -219,43 +137,54 @@ class File():
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
 
-        print( json.dumps( self.structure, indent = 2) )
-
         ''' UI '''
+        print( self.structure['cells'][0] )
+        input( self.structure['cells'][1] )
+        os.system( 'cls' if os.name == 'nt' else 'clear' )
+
+        x = offset = 0 # offset index, to be used if pk_inline is True
         for i, key in enumerate( self.structure['keys'] ):
+            x = i + offset
+
+            print( i )
             self.structure['field_names'].append( [] )
 
             for j, cell in enumerate( self.structure['cells'][i] ):
-                print( 'All fields must be named to properly store data from this raw file.' )
-                print( 'Please provide names for each field in the file "' + self.name + '".' )
-                print( 'Example data is shown below.\n' )
-                print( '(If necessary, please browse through the raw file to determine appropriate names.)\n' )
+                if key != 'PRIMARY KEY':
+                    print( 'All fields must be named to properly store data from this raw file.' )
+                    print( 'Please provide names for each field in the file "' + self.meta['name'] + '".' )
+                    print( 'Example data is shown below.\n' )
+                    print( '(If necessary, please browse through the raw file to determine appropriate names.)\n' )
 
-                ( f, l ) = cell
+                    ( f, l ) = cell
 
-                print( '#####################################################################\n')
-                print( 'Displaying data from LINE ' + sample_data['locs'][i] + ':\n' )
-                print( '> ' + key, end = '' )
-                print( '> ' + sample_data['hrules'][i], end = '' )
-                print( '> ' + sample_data['entries'][i], end = '' )
-                print( '> ' + ' ' * int( f ) + '^' )
-                print( '\n#####################################################################\n')
+                    print( '#####################################################################\n')
+                    print( 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n' )
+                    print( '> ' + key, end = '' )
+                    print( '> ' + sample_data['hrules'][x], end = '' )
+                    print( '> ' + sample_data['entries'][x], end = '' )
+                    print( '> ' + ' ' * int( f ) + '^' )
+                    print( '\n#####################################################################\n')
 
-                print( 'Please provide a name for this unnamed field.' )
-                print( '(Names must consist of non-blank characters.' )
-                print( ' For any given line of data, all field names must be unique.)\n' )
-                print( '>\t' + self.structure['keys'][i][f:l] )
-                print( '>\t' + sample_data['hrules'][i][f:l] )
-                print( '>\t' + sample_data['entries'][i][f:l] + '\n' )
+                    print( 'Please provide a name for this unnamed field.' )
+                    print( '(Names must consist of non-blank characters.' )
+                    print( ' For any given line of data, all field names must be unique.)\n' )
+                    print( '>\t' + self.structure['keys'][i][f:l] )
+                    print( '>\t' + sample_data['hrules'][x][f:l] )
+                    print( '>\t' + sample_data['entries'][x][f:l] + '\n' )
 
-                while True:
-                    name = input( '>> ' )
-                    if not name or not re.search( r'\S', name ):
-                        print( '\nPlease enter a non-blank name.\n' )
-                    elif name in self.structure['field_names'][i]:
-                        print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
-                    else:
-                        break
+                    while True:
+                        name = input( '>> ' )
+                        if not name or not re.search( r'\S', name ):
+                            print( '\nPlease enter a non-blank name.\n' )
+                        elif name in self.structure['field_names'][i]:
+                            print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
+                        else:
+                            break
+                else:
+                    name = self.meta['pk']
+                    offset -= 1
+
                 self.structure['field_names'][i].append( name )
                 print( '\n' )
                 os.system( 'cls' if os.name == 'nt' else 'clear' )
@@ -267,29 +196,59 @@ class File():
         '''
         n = -1 # member index
         for i, line in enumerate( self.raw ):
-            if Scanner.is_pk( self.pk, line ):
+            try:
+                nextline = self.raw[i+1]
+            except IndexError:
+                nextline = None
+
+                # push the last data_set to member
+                try:
+                    member['**SET_ID: ' + set_key] = data_set
+                except UnboundLocalError: pass
+
+                # push the last member to self.data
+                self.data[n] = member
+
+            if Scanner.is_pk( self.meta['pk'], line ):
                 # create a new data member
                 if n != -1:
                     # push previous data set into current member
                     try:
+                        print( 'Found PK. Pushing data_set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                         member['**SET_ID: ' + set_key] = data_set
-                    except UnboundLocalError:
-                        pass # carry on in case we haven't found a data_set yet
+                    except UnboundLocalError: pass
+                    # carry on in case we haven't found a data_set yet
 
                     ''' zip the previously parsed data point'''
                     self.data[n] = member
-                    if n == 0 or n == 1:
+                    if n != -1:
                         print( 'Pushing member[] to self.data[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
 
+                print( 'Clearing member dict.' )
                 member = {}
-                n += 1
+                print( 'Clearing data_set dict.' )
+                try: data_set = {}
+                except UnboundLocalError: pass
 
-            if Scanner.is_hrule( line ):
+                n += 1
+                print( 'Now populating member[{}]'.format( n ) )
+
+                if self.meta['pk_inline']:
+                    print( 'Found PK: {}'.format( line ) )
+                    i = self.structure['cells'][0][0][0]
+                    j = len( line ) - 1
+                    member['**SET_ID: 0'] = {
+                        '**ENTRY#: 0': {
+                            self.meta['pk']: line[i:j].strip()
+                        }
+                    }
+
+            if Scanner.is_hrule( line, nextline ):
                 # push previous data set into current member
                 try:
+                    if n != -1:
+                        print( '(Found HRULE. Pushing data_set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                     member['**SET_ID: ' + set_key] = data_set
-                    if n == 0 or n == 1:
-                        print( 'Pushing new set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                 except UnboundLocalError:
                     pass # carry on in case we haven't found a data_set yet
 
@@ -304,12 +263,21 @@ class File():
                 id_to_map = self.structure['set_ids'][index]
                 fix_to_map = self.structure['fix'][index]
 
-                # reset number of times data has been pushed under one hrule
-                c = 0
-
                 # sort each set into its own dict
                 set_key = str( id_to_map )
-                data_set = {}
+
+                # if there is already an entry in this set under the same hrule pattern:
+                try:
+                    if member['**SET_ID: ' + set_key]:
+                        print( 'Found a duplicate with set key: {}'.format( set_key ) )
+                        data_set = member['**SET_ID: ' + set_key]
+                        c = len( data_set )
+                    else:
+                        c = 0
+                        data_set = {}
+                except KeyError:
+                    c = 0
+                    data_set = {}
 
             if Scanner.is_data( line ):
                 this_names = names_to_map
@@ -323,19 +291,21 @@ class File():
                             output files.
                     '''
                     this_data = [
-                        Scanner.parse( 'DS' + self.raw[i+1], cell ) for cell in cells_to_map
+                        Scanner.parse( 'DS' + self.raw[i+1], cell )
+                        for cell in cells_to_map
                     ]
                 else:
                     this_data = [
-                        Scanner.parse( line, cell ) for cell in cells_to_map
+                        Scanner.parse( line, cell )
+                        for cell in cells_to_map
                     ]
 
                 # push data into appropriate set
-                if n == 0 or n == 1:
-                    print( 'Pushing new entry to member[]... (MEMBER: {}, SET_ID: {}, ENTRY: {})'.format( n, set_key, c ) )
-                data_set['**ENTRY#: ' + str( c )] = dict( zip( this_names, this_data ) )
+                data_set['**ENTRY#: {}'.format( c )] = dict( zip( this_names, this_data ) )
 
                 c += 1 # number of times data has been pushed under one hrule
+
+        print( json.dumps( self.data, indent = 2) )
 
     def write( self ):
         '''
@@ -350,6 +320,7 @@ class File():
 
         for i, field in enumerate( flat_fields ):
             self.sheet.cell( row = 1, column = i+1 ).value = field
+            self.sheet.cell( row = 1, column = i+1 ).fill =     PatternFill( 'solid', fgColor = "D0D0D0" )
 
         current_row = 2
         for i, m in enumerate( self.data ):
@@ -359,9 +330,12 @@ class File():
 
 class Scanner():
     @staticmethod
-    def is_hrule( line ):
+    def is_hrule( line, nextline ):
         ''' Number of spaced horizontal rules defines the number of fields for a given member '''
-        return re.search( r'-+', line ) and not re.match( r'^DS', line )
+        if nextline:
+            return re.search( r'-+', line ) and not re.match( r'^DS', line ) and re.match( r'^DS', nextline )
+
+        return False
 
     @staticmethod
     def is_pk( pk, line ):
@@ -426,15 +400,19 @@ class Scanner():
             for e in member[s]:
                 entry_num = int( re.search( r'\d', e ).group() )
                 for i, f in enumerate( member[s][e] ):
-                    # print( member[s][e][f] )
-                    ss.cell( row = cur + entry_num,
-                        column = wc[set_id] + i + 1 ).value = member[s][e][f]
+                    r = cur + entry_num
+                    c = wc[set_id] + i + 1
+
+                    cell = ss.cell( row = r, column = c )
+                    cell.value = member[s][e][f]
+                    if c == 1:
+                        cell.fill = PatternFill( 'solid', fgColor = "FFFF00" )
 
         return set_len
 
 ''' for use with test file '''
 test_book = Workbook()
-file_rp_all = File( 'SLI.txt', 'PAD' )
+file_rp_all = File( 'SERVICE_LIST.TXT' )
 
 ''' testing presets '''
 # Storage.load_pfile()
