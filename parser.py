@@ -394,11 +394,11 @@ class Scanner():
         '''
         set_len = 1 # rows to be reserved for this particular data set
         for s in member: # find the number of rows required
-            set_id = int( re.search( r'\d', s ).group() )
+            set_id = int( re.search( r'\d+', s ).group() )
             set_len = len( member[s] ) if len( member[s] ) > set_len else set_len
 
             for e in member[s]:
-                entry_num = int( re.search( r'\d', e ).group() )
+                entry_num = int( re.search( r'\d+', e ).group() )
                 for i, f in enumerate( member[s][e] ):
                     r = cur + entry_num
                     c = wc[set_id] + i + 1
