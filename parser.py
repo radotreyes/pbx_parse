@@ -2,12 +2,20 @@ import settings
 from savedata import Presets
 
 import re, os, json
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Color, PatternFill
 
 class RawFile():
-    def __init__( self, path ):
-        self.name = path.split( '.' )[0]
+    def __init__( self, path, book ):
+        self.book = book
+        print( '\n########' )
+        print( self.book )
+        print( type( self.book ) )
+        print( '########\n' )
+        self.name = os.path.split( path )[1].split( '.' )[0]
+        print( '\n########' )
+        print( self.name )
+        print( '########\n' )
 
         with open( path ) as file:
             self.content = file.readlines()
@@ -63,7 +71,7 @@ class RawFile():
         cmd = rawdata[0].split( 'COMMAND:' )[1].split( '\n' )[0]
 
         # creates a new Record object from this data record
-        test_record = Record( name, rawdata, cmd )
+        test_record = Record( name, rawdata, cmd, self.book )
 
 
 class Record():
@@ -72,7 +80,7 @@ class Record():
     are set on initialization.
     '''
 
-    def __init__( self, name, rawdata, command ):
+    def __init__( self, name, rawdata, command, book ):
         # Open file
         self.raw = rawdata
 
@@ -121,7 +129,10 @@ class Record():
 
         # Data object and output worksheet
         self.data = {} # actually contains the data
-        self.sheet = test_book.active
+        self.book = book
+        self.wb = Workbook()
+        self.sheet = self.wb.create_sheet( self.meta['name'] )
+        input( 'Workbook initialized' )
 
         # Read the file and output to Excel
         # TODO: Move to user control
@@ -179,8 +190,6 @@ class Record():
                     self.structure['set_ids'].append( f_id )
                     self.structure['fix'].append( False )
                     self.meta['pk_inline'] = True
-                    # print( self.structure['cells'][0] )
-                    # input( type( self.structure['cells'][0] ) )
                     f_id += 1
 
             if point and Scanner.is_hrule( line, nextline ): # if we find a horizontal rule
@@ -417,7 +426,7 @@ class Record():
         for i, m in enumerate( self.data ):
             current_row += Scanner.transcribe( self.data[m], self.sheet, current_row, self.structure['write_columns'] )
 
-        test_book.save( 'test.xlsx' )
+        self.wb.save( self.book )
 
 class Scanner():
     @staticmethod
@@ -501,9 +510,10 @@ class Scanner():
 
         return set_len
 
-''' testing presets '''
-Presets.load_pfile()
+if __name__ == '__main__':
+    ''' testing presets '''
+    Presets.load_pfile()
 
-''' for use with test file '''
-test_book = Workbook()
-file_rp_all = RawFile( 'SERVICE_LIST.TXT' )
+    ''' for use with test file '''
+    book = Workbook()
+    file_rp_all = RawFile( 'RP_ALL.txt' )
