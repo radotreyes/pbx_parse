@@ -125,13 +125,14 @@ class Record():
                 'set_ids': [], # integers corresponding 1:1 to a data pattern
                 'write_columns': [], # starting indices of grouped field names, 0ind
             }
-            self.set_structure()
+        self.set_structure()
 
-        # Data object and output worksheet
+        # Data object
         self.data = {} # actually contains the data
-        self.book = book
-        self.wb = Workbook()
-        self.sheet = self.wb.create_sheet( self.meta['name'] )
+
+        # Output worksheet
+        self.wb = { 'book': load_workbook( book ), 'path': book }
+        self.sheet = self.wb['book'].create_sheet( self.meta['name'] )
         input( 'Workbook initialized' )
 
         # Read the file and output to Excel
@@ -229,6 +230,7 @@ class Record():
 
             x = offset = 0 # offset index, to be used if pk_inline is True
             for i, key in enumerate( self.structure['keys'] ):
+                input( 'hello' )
                 x = i + offset
 
                 self.structure['field_names'].append( [] )
@@ -426,7 +428,10 @@ class Record():
         for i, m in enumerate( self.data ):
             current_row += Scanner.transcribe( self.data[m], self.sheet, current_row, self.structure['write_columns'] )
 
-        self.wb.save( self.book )
+        self.wb['book'].save( self.wb['path'] )
+
+        ''' DEBUG'''
+        print( 'Parsing finished.\nFile {} saved to workbook {}.'.format( self.meta['name'], self.wb['path'] ) )
 
 class Scanner():
     @staticmethod
@@ -516,4 +521,4 @@ if __name__ == '__main__':
 
     ''' for use with test file '''
     book = Workbook()
-    file_rp_all = RawFile( 'RP_ALL.txt' )
+    file_rp_all = RawFile( 'EXTEN.txt', 'test.xlsx' )
