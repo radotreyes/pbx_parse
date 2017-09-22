@@ -1,21 +1,17 @@
-import settings
+import settings, savedata, main
 from savedata import Presets
+from relay import *
+from main import *
 
 import re, os, json
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Color, PatternFill
 
 class RawFile():
-    def __init__( self, path, book ):
+    def __init__( self, path, book, request = None ):
         self.book = book
-        print( '\n########' )
-        print( self.book )
-        print( type( self.book ) )
-        print( '########\n' )
         self.name = os.path.split( path )[1].split( '.' )[0]
-        print( '\n########' )
-        print( self.name )
-        print( '########\n' )
+        self.request = Presets.request = request
 
         with open( path ) as file:
             self.content = file.readlines()
@@ -71,7 +67,7 @@ class RawFile():
         cmd = rawdata[0].split( 'COMMAND:' )[1].split( '\n' )[0]
 
         # creates a new Record object from this data record
-        test_record = Record( name, rawdata, cmd, self.book )
+        test_record = Record( name, rawdata, cmd, self.book, self.request )
 
 
 class Record():
@@ -80,29 +76,32 @@ class Record():
     are set on initialization.
     '''
 
-    def __init__( self, name, rawdata, command, book ):
+    def __init__( self, name, rawdata, command, book, request ):
         # Open file
         self.raw = rawdata
+        self.request = request
 
-        input( '\nParsing record ' + name + '.' )
+        confirm( '\nParsing record ' + name + '.' )
 
         ''' LOADING PRESETS '''
         if Presets.pdata:
             while True:
-                print( 'You have saved presets.' )
-                print( 'Would you like to load a preset for this file? (Y/N)' )
-                use = input( '>> ' ).lower()
-                if use == 'y':
+                if self.request:
+                    use = choose( 'You have saved presets.\nWould you like to load a preset for this file? (Y/N)' )
+                else:
+                    choose( 'You have saved presets.\nWould you like to load a preset for this file? (Y/N)' )
+                    use = input( '>> ' ).lower()
+                if true( use ):
                     pdata = Presets.get_pdata()
                     self.meta = pdata['meta']
                     self.structure = pdata['structure']
                     self.presets = True
                     break
-                elif use == 'n':
+                elif false( use ):
                     self.presets = False
                     break
                 else:
-                    print( 'Please enter a valid input.' )
+                    confirm( 'Please enter a valid input.' )
         else:
             self.presets = False
 
@@ -133,7 +132,7 @@ class Record():
         # Output worksheet
         self.wb = { 'book': load_workbook( book ), 'path': book }
         self.sheet = self.wb['book'].create_sheet( self.meta['name'] )
-        input( 'Workbook initialized' )
+        confirm( 'Workbook initialized' )
 
         # Read the file and output to Excel
         # TODO: Move to user control
@@ -146,11 +145,10 @@ class Record():
 
     def set_meta( self ):
         os.system( 'cls' if os.name == 'nt' else 'clear' )
-        print( 'Please enter the primary key for this data set.' )
         while True:
-            pk = input( '>> ' )
+            pk = prompt( 'Please enter the primary key for this data set.\n>> ' )
             if not pk or not re.search( r'\S', pk ):
-                print( '\nPlease enter a non-blank name.\n' )
+                confirm( '\nPlease enter a non-blank name.\n' )
             else:
                 break
         self.meta['pk'] = r'' + re.escape( pk )
@@ -198,7 +196,6 @@ class Record():
 
                 # store the horizontal rule pattern
                 if k not in self.structure['keys']:
-                    # input( 'Appending {} on line {}'.format( c, i ) )
                     self.structure['keys'].append( k )
                     self.structure['cells'].append( c )
                     self.structure['set_ids'].append( f_id )
@@ -230,41 +227,39 @@ class Record():
 
             x = offset = 0 # offset index, to be used if pk_inline is True
             for i, key in enumerate( self.structure['keys'] ):
-                input( 'hello' )
                 x = i + offset
 
                 self.structure['field_names'].append( [] )
 
                 for j, cell in enumerate( self.structure['cells'][i] ):
                     if key != 'PRIMARY KEY':
-                        print( 'All fields must be named to properly store data from this raw file.' )
-                        print( 'Please provide names for each field in the file "' + self.meta['name'] + '".' )
-                        print( 'Example data is shown below.\n' )
-                        print( '(If necessary, please browse through the raw file to determine appropriate names.)\n' )
+                        message = ''
+                        message += 'All fields must be named to properly store data from this raw file. '
+                        message += 'Please provide names for each field in the file "' + self.meta['name'] + '". '
+                        message += 'Example data is shown below.\n'
+                        message += '(If necessary, please browse through the raw file to determine appropriate names.)\n'
 
                         ( f, l ) = cell
 
-                        print( '#####################################################################\n')
-                        print( 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n' )
-                        print( '> ' + key, end = '' )
-                        print( '> ' + sample_data['hrules'][x], end = '' )
-                        print( '> ' + sample_data['entries'][x], end = '' )
-                        print( '> ' + ' ' * int( f ) + '^' )
-                        print( '\n#####################################################################\n')
+                        message += 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n'
+                        message += '> ' + key + '\n'
+                        message += '> ' + sample_data['hrules'][x] + '\n'
+                        message += '> ' + sample_data['entries'][x] + '\n'
+                        message += '> ' + ' ' * int( f ) + '^' + '\n\n'
 
-                        print( 'Please provide a name for this unnamed field.' )
-                        print( '(Names must consist of non-blank characters.' )
-                        print( ' For any given line of data, all field names must be unique.)\n' )
-                        print( '>\t' + self.structure['keys'][i][f:l] )
-                        print( '>\t' + sample_data['hrules'][x][f:l] )
-                        print( '>\t' + sample_data['entries'][x][f:l] + '\n' )
+                        message += 'Please provide a name for this unnamed field.'
+                        message += '(Names must consist of non-blank characters.'
+                        message += ' For any given line of data, all field names must be unique.)\n'
+                        message += '>\t' + self.structure['keys'][i][f:l] + '\n'
+                        message += '>\t' + sample_data['hrules'][x][f:l] + '\n'
+                        message += '>\t' + sample_data['entries'][x][f:l] + '\n>> '
 
                         while True:
-                            name = input( '>> ' )
+                            name = prompt( message )
                             if not name or not re.search( r'\S', name ):
-                                print( '\nPlease enter a non-blank name.\n' )
+                                confirm( '\nPlease enter a non-blank name.\n' )
                             elif name in self.structure['field_names'][i]:
-                                print( '\nThat name is already in use for this line. Please enter a unique name.\n' )
+                                confirm( '\nThat name is already in use for this line. Please enter a unique name.\n' )
                             else:
                                 break
                     else:
@@ -278,13 +273,16 @@ class Record():
 
         ''' SAVING PRESETS '''
         while True:
-            print( 'Save your entries as a new preset? (Y/N)')
-            save = input( '>> ' ).lower()
-            if save == 'y':
+            if self.request:
+                save = choose( 'Save your entries as a new preset? (Y/N)' )
+            else:
+                choose( 'Save your entries as a new preset? (Y/N)' )
+                save = input( '>> ' ).lower()
+            if true( save ):
                 Presets.append_pdata( self.meta, self.structure )
                 Presets.save_pdata()
                 break
-            elif save == 'n' :
+            elif false( save ):
                 break
             else:
                 print( 'Please enter a valid input.' )

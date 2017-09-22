@@ -11,7 +11,9 @@ Handles storage of user data, including:
             _command_
 '''
 
-import settings
+import settings, parser, main
+from main import *
+from relay import *
 import re, os, json
 
 class Presets():
@@ -23,6 +25,7 @@ class Presets():
     ppath = settings.DEFAULT_PPATH # preset file path
     pname = settings.DEFAULT_PNAME # preset file name without extension
     pdata = None
+    request = None
 
     # DEFAULT PROCEDURE
     # creset preset file if it doesn't exist
@@ -44,13 +47,16 @@ class Presets():
         # If the file exists, confirm if the user wants to overwrite
         if os.path.isfile( path ):
             while True:
-                print( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
-                w = input( '>> ' ).lower()
-                if w == 'y':
-                    print( 'Overwriting...' )
+                if request:
+                    w = choose( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
+                else:
+                    choose( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
+                    w = input( '>> ' ).lower()
+                if true( w ):
+                    confirm( 'Overwriting...' )
                     break
-                elif w == 'n':
-                    print( 'Didn\'t overwrite.' )
+                elif false( w ):
+                    confirm( 'Didn\'t overwrite.' )
                     return False # stop trying to create a new file
                 print( '\nPlease enter a valid input.\n' )
 
@@ -86,7 +92,7 @@ class Presets():
 
         if not os.path.isfile( path ):
             # create the file if it doesn't exist
-            print( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
+            confirm( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
             Presets.new_pfile( name )
         else:
             # change the file path and load data
@@ -94,18 +100,17 @@ class Presets():
             cls.pname = name
             Presets.load_pfile()
 
-        print( 'Changed presets file to {}.py.'.format( name ) )
+        confirm( 'Changed presets file to {}.py.'.format( name ) )
 
     @classmethod
     def get_pdata( cls ):
         '''
         Retrieve the preset data from the currently imported preset file.
         '''
-        print( 'Getting saved presets from {}.py ...'.format( cls.pname ) )
         if cls.pdata:
-            print( 'Found these presets.' )
-            for preset in cls.pdata:
-                print( preset )
+            preset_list = [ preset for preset in cls.pdata ]
+            input( type( cls.request ) )
+            aux = cls.request.list_select( 'Choose a preset', preset_list )
 
             while True:
                 key = input( 'Which preset do you want to load?\n>> ' )
