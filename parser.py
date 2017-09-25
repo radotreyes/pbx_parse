@@ -81,8 +81,6 @@ class Record():
         self.raw = rawdata
         self.request = request
 
-        confirm( '\nParsing record ' + name + '.' )
-
         ''' LOADING PRESETS '''
         if Presets.pdata:
             while True:
@@ -132,7 +130,6 @@ class Record():
         # Output worksheet
         self.wb = { 'book': load_workbook( book ), 'path': book }
         self.sheet = self.wb['book'].create_sheet( self.meta['name'] )
-        confirm( 'Workbook initialized' )
 
         # Read the file and output to Excel
         # TODO: Move to user control
@@ -146,7 +143,7 @@ class Record():
     def set_meta( self ):
         os.system( 'cls' if os.name == 'nt' else 'clear' )
         while True:
-            pk = prompt( 'Please enter the primary key for this data set.\n>> ' )
+            pk = prompt( 'Please enter the primary key for this data set.' )
             if not pk or not re.search( r'\S', pk ):
                 confirm( '\nPlease enter a non-blank name.\n' )
             else:
@@ -233,33 +230,31 @@ class Record():
 
                 for j, cell in enumerate( self.structure['cells'][i] ):
                     if key != 'PRIMARY KEY':
-                        message = ''
-                        message += 'All fields must be named to properly store data from this raw file. '
-                        message += 'Please provide names for each field in the file "' + self.meta['name'] + '". '
-                        message += 'Example data is shown below.\n'
-                        message += '(If necessary, please browse through the raw file to determine appropriate names.)\n'
-
                         ( f, l ) = cell
 
-                        message += 'Displaying data from LINE ' + sample_data['locs'][x] + ':\n'
-                        message += '> ' + key + '\n'
+                        message = '> ' + key + '\n'
                         message += '> ' + sample_data['hrules'][x] + '\n'
                         message += '> ' + sample_data['entries'][x] + '\n'
-                        message += '> ' + ' ' * int( f ) + '^' + '\n\n'
+                        message += '> ' + ' ' * int( f ) + '^' + '\n'
+                        message += '> ' + ' ' * int( f ) + '^' + '\n'
 
-                        message += 'Please provide a name for this unnamed field.'
-                        message += '(Names must consist of non-blank characters.'
-                        message += ' For any given line of data, all field names must be unique.)\n'
-                        message += '>\t' + self.structure['keys'][i][f:l] + '\n'
-                        message += '>\t' + sample_data['hrules'][x][f:l] + '\n'
-                        message += '>\t' + sample_data['entries'][x][f:l] + '\n>> '
+                        confirm( 'Please provide names for each field in the file "{}".\n\nAll fields must be properly named to store data from this raw file. If necessary, please browse through the raw file to determine appropriate names.'.format( self.meta['name'] ) )
 
                         while True:
-                            name = prompt( message )
+                            lp = LongPrompt(
+                                'Name data files',
+                                'Please provide a name for the data field shown below.\nNames must consist of non-blank characters.\nData fields which are on the same line must have unique names.\n\nDisplaying data from LINE ' + sample_data['locs'][x] + ':',
+                                message
+                             )
+                            self.request.wait_window( lp.top )
+                            name = lp.response.get()
+
                             if not name or not re.search( r'\S', name ):
                                 confirm( '\nPlease enter a non-blank name.\n' )
                             elif name in self.structure['field_names'][i]:
                                 confirm( '\nThat name is already in use for this line. Please enter a unique name.\n' )
+                            elif name == 'ABORT':
+                                return False
                             else:
                                 break
                     else:
@@ -285,7 +280,7 @@ class Record():
             elif false( save ):
                 break
             else:
-                print( 'Please enter a valid input.' )
+                confirm( 'Please enter a valid input.' )
 
         os.system( 'cls' if os.name == 'nt' else 'clear' )
 
@@ -314,27 +309,20 @@ class Record():
                 if n != -1:
                     # push previous data set into current member
                     try:
-                        print( 'Found PK. Pushing data_set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                         member['**SET_ID: ' + set_key] = data_set
                     except UnboundLocalError: pass
                     # carry on in case we haven't found a data_set yet
 
                     ''' zip the previously parsed data point'''
                     self.data[n] = member
-                    if n != -1:
-                        print( 'Pushing member[] to self.data[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
 
-                print( 'Clearing member dict.' )
                 member = {}
-                print( 'Clearing data_set dict.' )
                 try: data_set = {}
                 except UnboundLocalError: pass
 
                 n += 1
-                print( 'Now populating member[{}]'.format( n ) )
 
                 if self.meta['pk_inline']:
-                    print( 'Found PK: {}'.format( line ) )
                     i = self.structure['cells'][0][0][0]
                     j = len( line ) - 1
                     member['**SET_ID: 0'] = {
@@ -346,8 +334,6 @@ class Record():
             if Scanner.is_hrule( line, nextline ):
                 # push previous data set into current member
                 try:
-                    if n != -1:
-                        print( '(Found HRULE. Pushing data_set to member[]... (MEMBER: {}, SET_ID: {})'.format( n, set_key ) )
                     member['**SET_ID: ' + set_key] = data_set
                 except UnboundLocalError:
                     pass # carry on in case we haven't found a data_set yet
@@ -369,7 +355,6 @@ class Record():
                 # if there is already an entry in this set under the same hrule pattern:
                 try:
                     if member['**SET_ID: ' + set_key]:
-                        print( 'Found a duplicate with set key: {}'.format( set_key ) )
                         data_set = member['**SET_ID: ' + set_key]
                         c = len( data_set )
                     else:
@@ -429,7 +414,7 @@ class Record():
         self.wb['book'].save( self.wb['path'] )
 
         ''' DEBUG'''
-        print( 'Parsing finished.\nFile {} saved to workbook {}.'.format( self.meta['name'], self.wb['path'] ) )
+        confirm( 'Parsing finished.\nFile was saved to workbook {}.'.format( self.wb['path'] ) )
 
 class Scanner():
     @staticmethod

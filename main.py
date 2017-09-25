@@ -61,7 +61,7 @@ class Main( Frame ):
 
         # parent frame geometry
         w = 600 # width
-        h = 480 # height
+        h = 400 # height
         x = self.master.winfo_screenwidth() # screen offset X
         y = self.master.winfo_screenheight() # screen offset Y
 
@@ -267,9 +267,83 @@ class Main( Frame ):
         self.preset_files.set( '{}'.format( self.preset_file ) )
         self.set_parse()
 
-    def list_select( self, title, presets ):
-        top = Toplevel( self )
-        top.title( title )
+class LongPrompt( Frame ):
+    def __init__( self, title, prompt, display, master = None ):
+        super().__init__()
+        self.top = Toplevel()
+        self.top.title( title )
+        self.response = StringVar()
+
+        # parent frame geometry
+        w = self.master.winfo_width() # width
+        h = self.master.winfo_height() # height
+        x = self.master.winfo_screenwidth() # screen offset X
+        y = self.master.winfo_screenheight() # screen offset Y
+
+        x = int( ( x - w ) / 2 ) # center horizontal
+        y = int( ( y - h ) / 2 ) # center vertical
+        self.top.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
+
+        self.top.frame_display = Frame( self.top )
+        self.top.frame_display.pack(
+            fill = X,
+            padx = 5,
+            pady = 5
+        )
+
+        self.top.lbl_header = Label( self.top.frame_display, text = prompt )
+        self.top.lbl_header.pack( fill = X, padx = 5, expand = True )
+        self.top.display = Label(
+            self.top.frame_display,
+            text = display,
+            relief = SUNKEN,
+            background = '#FFF'
+        )
+        self.top.display.pack(
+            fill = X,
+            ipadx = 5,
+            padx = 5,
+            ipady = 5,
+            pady = 5,
+        )
+
+        self.top.e = Entry( self.top )
+        self.top.e.pack(
+            fill = X,
+            padx = 10,
+            pady = 5,
+        )
+
+        self.top.button_grid = Frame( self.top, borderwidth = 1 )
+        self.top.button_grid.pack()
+        self.top.btn_select = Button(
+            self.top,
+            text = 'OK',
+            command = self.respond
+        )
+        self.top.btn_select.pack( side = LEFT, padx = 10, pady = 10 )
+        self.top.btn_back = Button(
+            self.top,
+            text = 'Abort Parsing',
+            command = self.abort
+        )
+        self.top.btn_back.pack( side = RIGHT, padx = 10, pady = 10 )
+
+    def respond( self ):
+        self.response.set( self.top.e.get() )
+        self.top.destroy()
+
+    def abort( self ):
+        self.response.set( 'ABORT' )
+        self.top.destroy()
+
+class ListDialog( Frame ):
+    def __init__( self, title, prompt, presets, master = None ):
+        super().__init__()
+        self.top = Toplevel()
+        self.top.title( title )
+        self.key = StringVar()
+
         # parent frame geometry
         w = 300 # width
         h = 400 # height
@@ -278,31 +352,46 @@ class Main( Frame ):
 
         x = int( ( x - w ) / 2 ) # center horizontal
         y = int( ( y - h ) / 2 ) # center vertical
-        top.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
+        self.top.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
 
-        top.frame_list = Frame( top )
-        top.frame_list.pack( fill = BOTH, expand = True )
-        top.list = Listbox(
-            top.frame_list,
+        self.top.frame_list = Frame( self.top )
+        self.top.frame_list.pack( fill = BOTH, expand = True )
+
+        self.top.lbl_header = Label( self.top.frame_list, text = prompt )
+        self.top.lbl_header.pack( fill = X, padx = 5, expand = True)
+
+        self.top.button_grid = Frame( self.top, borderwidth = 1 )
+        self.top.button_grid.pack( fill = BOTH, expand = True )
+        self.top.btn_select = Button(
+            self.top,
+            text = 'Select',
+            command = self.set_key
+        )
+        self.top.btn_select.pack( side = LEFT, padx = 5, pady = 10 )
+        self.top.btn_back = Button(
+            self.top,
+            text = 'Back',
+            command = self.top.destroy
+        )
+        self.top.btn_back.pack( side = RIGHT, padx = 5, pady = 10 )
+
+        self.top.list = Listbox(
+            self.top.frame_list,
             relief = SUNKEN,
             background = '#FFF'
         )
-        top.list.pack(
+        self.top.list.pack(
             fill = BOTH,
             padx = 5,
             pady = ( 10, 5 ),
             expand = True
         )
         for preset in presets:
-            top.list.insert( END, preset )
+            self.top.list.insert( END, preset )
 
-        top.button_grid = Frame( top, borderwidth = 1 )
-        top.button_grid.pack( fill = BOTH, expand = True )
-        top.btn_start = Button( top, text = 'Select', command = None )
-        top.btn_start.pack( side = LEFT, padx = 5, pady = 10 )
-        top.btn_quit = Button( top, text = 'Back', command = None )
-        top.btn_quit.pack( side = RIGHT, padx = 5, pady = 10 )
-
+    def set_key( self ):
+        self.key.set( self.top.list.get( ACTIVE ) )
+        self.top.destroy()
 
 if __name__ == '__main__':
     savedata.Presets.load_pfile()
