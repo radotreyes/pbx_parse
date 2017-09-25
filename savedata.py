@@ -11,7 +11,9 @@ Handles storage of user data, including:
             _command_
 '''
 
-import settings
+import settings, parser, main
+from main import *
+from relay import *
 import re, os, json
 
 class Presets():
@@ -23,6 +25,7 @@ class Presets():
     ppath = settings.DEFAULT_PPATH # preset file path
     pname = settings.DEFAULT_PNAME # preset file name without extension
     pdata = None
+    request = None
 
     # DEFAULT PROCEDURE
     # creset preset file if it doesn't exist
@@ -44,13 +47,16 @@ class Presets():
         # If the file exists, confirm if the user wants to overwrite
         if os.path.isfile( path ):
             while True:
-                print( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
-                w = input( '>> ' ).lower()
-                if w == 'y':
-                    print( 'Overwriting...' )
+                if request:
+                    w = choose( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
+                else:
+                    choose( 'The file "{}.py" already exists. Overwrite? (Y/N)'.format( name ) )
+                    w = input( '>> ' ).lower()
+                if true( w ):
+                    confirm( 'Overwriting...' )
                     break
-                elif w == 'n':
-                    print( 'Didn\'t overwrite.' )
+                elif false( w ):
+                    confirm( 'Didn\'t overwrite.' )
                     return False # stop trying to create a new file
                 print( '\nPlease enter a valid input.\n' )
 
@@ -86,7 +92,7 @@ class Presets():
 
         if not os.path.isfile( path ):
             # create the file if it doesn't exist
-            print( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
+            confirm( 'The file {}.py doesn\'t exist. Creating it now.'.format( name ) )
             Presets.new_pfile( name )
         else:
             # change the file path and load data
@@ -94,32 +100,37 @@ class Presets():
             cls.pname = name
             Presets.load_pfile()
 
-        print( 'Changed presets file to {}.py.'.format( name ) )
+        confirm( 'Changed presets file to {}.py.'.format( name ) )
 
     @classmethod
     def get_pdata( cls ):
         '''
         Retrieve the preset data from the currently imported preset file.
         '''
-        print( 'Getting saved presets from {}.py ...'.format( cls.pname ) )
         if cls.pdata:
-            print( 'Found these presets.' )
-            for preset in cls.pdata:
-                print( preset )
+            preset_list = [ preset for preset in cls.pdata ]
+            k = ListDialog( 'Load a preset', 'Please choose a preset:', preset_list )
+            cls.request.wait_window( k.top )
+            # DEBUG
+            # input( 'Retrieving preset data from "{}"'.format( k.key.get() ) )
+            return cls.pdata[k.key.get()]
 
-            while True:
-                key = input( 'Which preset do you want to load?\n>> ' )
-                print( 'Type \'exit\' to abort.' )
-                if not key or not re.search( r'\S', key ):
-                    print( 'Please enter a valid name.' )
-                elif key.lower() == 'exit':
-                    return False
-                else:
-                    try:
-                        if cls.pdata[key]:
-                            return cls.pdata[key]
-                    except KeyError:
-                        print( 'That preset doesn\'t exist!' )
+            ''' moved this stuff from terminal to Tkinter '''
+            #
+            # while True:
+            #     key = input( 'Which preset do you want to load?\n>> ' )
+            #     ( 'Type \'exit\' to abort.' )
+            #     if not key or not re.search( r'\S', key ):
+            #         print( 'Please enter a valid name.' )
+            #     elif key.lower() == 'exit':
+            #         return False
+            #     else:
+            #         try:
+            #             if cls.pdata[key]:
+            #                 return cls.pdata[key]
+            #         except KeyError:
+            #             print( 'That preset doesn\'t exist!' )
+            ''' '''
         else:
             print( 'There are no presets here!' )
             return False
@@ -131,9 +142,9 @@ class Presets():
         IN: _value_, the value of the preset that is to be saved.
         '''
         while True:
-            key = input( 'Please enter a name to save this preset under, or type \'exit\' to go back:\n>> ' )
+            key = prompt( 'Please enter a name to save this preset under.' )
             if not key or not re.search( r'\S', key ):
-                print( '\nPlease enter a non-blank name.\n' )
+                confirm( '\nPlease enter a non-blank name.\n' )
             elif key.lower() == 'exit':
                 return False # exit the function
             else:
@@ -141,18 +152,18 @@ class Presets():
                     # see if the preset already exists
                     if cls.pdata[key]:
                         while True:
-                            print( 'There is already a preset with this name. Do you want to overwrite it? (Y/N)' )
+                            choose( 'There is already a preset with this name. Do you want to overwrite it? (Y/N)' )
                             w = input( '>> ').lower()
-                            if w == 'y':
+                            if true( w ):
                                 cls.pdata[key]['meta'] = meta
                                 cls.pdata[key]['structure'] = structure
                                 Presets.save_pdata()
-                                print( json.dumps( cls.pdata, indent = 2 ) )
+                                # print( json.dumps( cls.pdata, indent = 2 ) )
                                 return False # exit the function
-                            elif w == 'n':
-                                print( 'Didn\'t overwrite.' )
+                            elif false( w ):
+                                confirm( 'Didn\'t overwrite.' )
                                 break
-                            print( '\nPlease enter a valid input.\n' )
+                            # print( '\nPlease enter a valid input.\n' )
                 except KeyError:
                     # the preset doesn't already exist, so create it
                     cls.pdata[key] = {}

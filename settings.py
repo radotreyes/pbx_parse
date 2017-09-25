@@ -8,7 +8,7 @@ import os
 
 ''' PRESET DATA '''
 # default preset file to be loaded
-DEFAULT_PNAME = 'test' # file name without extension
+DEFAULT_PNAME = 'presets' # file name without extensionw
 DEFAULT_PPATH = os.path.join( os.getcwd(), '{}.py'.format( DEFAULT_PNAME ) )
 
 # default content to be written to new preset files

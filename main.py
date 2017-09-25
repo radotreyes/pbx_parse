@@ -16,19 +16,52 @@ from tkinter.filedialog import askopenfilename, asksaveasfile, askdirectory
 from tkinter.simpledialog import askstring
 
 import os, re
-import parser, settings
-from savedata import Presets
+import parser, settings, savedata
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Color, PatternFill
 
-class AppWindow( Frame ):
+class AuxList( Frame ):
+    def __init__( self, title, list, master = None ):
+        super().__init__()
+
+        # parent frame geometry
+        w = 150 # width
+        h = 300 # height
+        x = self.master.winfo_screenwidth() # screen offset X
+        y = self.master.winfo_screenheight() # screen offset Y
+
+        x = int( ( x - w ) / 2 ) # center horizontal
+        y = int( ( y - h ) / 2 ) # center vertical
+        self.master.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
+
+        self.master.title( title )
+        self.pack( fill = BOTH, expand = 1 )
+
+        self.style = Style()
+        self.style.theme_use( 'clam' ) # default theme for now
+
+        self.frame_list = Frame( self )
+        self.frame_list.pack( fill = X )
+        self.list = Listbox( self.frame_list,
+            relief = SUNKEN,
+            background = '#FFF' )
+        self.list.pack( side = TOP, fill = X, padx = 5, pady = ( 10, 5 ), expand = True )
+
+        self.button_grid = Frame( self, borderwidth = 1 )
+        self.button_grid.pack( fill = BOTH, expand = True )
+        self.btn_start = Button( self, text = 'Select', command = None )
+        self.btn_start.pack( side = LEFT, padx = 5, pady = 10 )
+        self.btn_quit = Button( self, text = 'Back', command = None )
+        self.btn_quit.pack( side = RIGHT, padx = 5, pady = 10 )
+
+class Main( Frame ):
     def __init__( self ):
         super().__init__()
 
         # parent frame geometry
         w = 600 # width
-        h = 480 # height
+        h = 400 # height
         x = self.master.winfo_screenwidth() # screen offset X
         y = self.master.winfo_screenheight() # screen offset Y
 
@@ -44,6 +77,8 @@ class AppWindow( Frame ):
         self.init_UI_dynamic()
         self.set_parse()
 
+    def __str__( self ):
+        return 'Tkinter GUI'
 
     def init_UI_static( self ):
         ''' Initialize static UI elements '''
@@ -58,8 +93,8 @@ class AppWindow( Frame ):
         # Data File
         self.frame_data = Frame( self )
         self.frame_data.pack( fill = X )
-        self.lbl_data = Label( self.frame_data, text = 'Data Files', width = 12 )
-        self.lbl_data.pack( side = LEFT, padx = 5, pady = 10 )
+        self.lbl_data = Label( self.frame_data, text = 'Data Files:', width = 12, relief = FLAT )
+        self.lbl_data.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
 
         self.frame_data_btn = Frame( self )
         self.frame_data_btn.pack( fill = X )
@@ -71,8 +106,8 @@ class AppWindow( Frame ):
         # Excel Workbook
         self.frame_xlsx = Frame( self )
         self.frame_xlsx.pack( fill = X, pady = ( 10, 0 ) )
-        self.lbl_xlsx = Label( self.frame_xlsx, text = 'Workbook', width = 12 )
-        self.lbl_xlsx.pack( side = LEFT, padx = 5, pady = 10 )
+        self.lbl_xlsx = Label( self.frame_xlsx, text = 'Workbook:', width = 12, relief = FLAT )
+        self.lbl_xlsx.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
         self.frame_xlsx_btn = Frame( self )
         self.frame_xlsx_btn.pack( fill = X )
         btn_load_wb = Button( self.frame_xlsx_btn, text = 'Load...', command = self.set_wb )
@@ -83,8 +118,8 @@ class AppWindow( Frame ):
         # Presets File
         self.frame_preset = Frame( self )
         self.frame_preset.pack( fill = X, pady = ( 10, 0 ) )
-        self.lbl_preset = Label( self.frame_preset, text = 'Presets File:', width = 12 )
-        self.lbl_preset.pack( side = LEFT, padx = 5, pady = 10 )
+        self.lbl_preset = Label( self.frame_preset, text = 'Presets File:', width = 12, relief = FLAT )
+        self.lbl_preset.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
         self.frame_preset_btn = Frame( self )
         self.frame_preset_btn.pack( fill = X )
         btn_preset = Button( self.frame_preset_btn, text = 'Choose...', command = self.set_preset )
@@ -132,10 +167,9 @@ class AppWindow( Frame ):
 
     def parse( self ):
         ''' Execute the parser '''
-        Presets.load_pfile()
         for f in self.files_to_parse:
             print( 'PARSING:\n\tDATA FILE: {}\n\tWORKBOOK: {}'.format( f, self.wb_file ) )
-            parser.RawFile( f, self.wb_file )
+            parser.RawFile( f, self.wb_file, self )
 
     def set_parse( self ):
         if self.files_to_parse and self.wb_file and self.preset_file:
@@ -233,7 +267,134 @@ class AppWindow( Frame ):
         self.preset_files.set( '{}'.format( self.preset_file ) )
         self.set_parse()
 
+class LongPrompt( Frame ):
+    def __init__( self, title, prompt, display, master = None ):
+        super().__init__()
+        self.top = Toplevel()
+        self.top.title( title )
+        self.response = StringVar()
+
+        # parent frame geometry
+        w = self.master.winfo_width() # width
+        h = self.master.winfo_height() # height
+        x = self.master.winfo_screenwidth() # screen offset X
+        y = self.master.winfo_screenheight() # screen offset Y
+
+        x = int( ( x - w ) / 2 ) # center horizontal
+        y = int( ( y - h ) / 2 ) # center vertical
+        self.top.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
+
+        self.top.frame_display = Frame( self.top )
+        self.top.frame_display.pack(
+            fill = X,
+            padx = 5,
+            pady = 5
+        )
+
+        self.top.lbl_header = Label( self.top.frame_display, text = prompt )
+        self.top.lbl_header.pack( fill = X, padx = 5, expand = True )
+        self.top.display = Label(
+            self.top.frame_display,
+            text = display,
+            relief = SUNKEN,
+            background = '#FFF'
+        )
+        self.top.display.pack(
+            fill = X,
+            ipadx = 5,
+            padx = 5,
+            ipady = 5,
+            pady = 5,
+        )
+
+        self.top.e = Entry( self.top )
+        self.top.e.pack(
+            fill = X,
+            padx = 10,
+            pady = 5,
+        )
+
+        self.top.button_grid = Frame( self.top, borderwidth = 1 )
+        self.top.button_grid.pack()
+        self.top.btn_select = Button(
+            self.top,
+            text = 'OK',
+            command = self.respond
+        )
+        self.top.btn_select.pack( side = LEFT, padx = 10, pady = 10 )
+        self.top.btn_back = Button(
+            self.top,
+            text = 'Abort Parsing',
+            command = self.abort
+        )
+        self.top.btn_back.pack( side = RIGHT, padx = 10, pady = 10 )
+
+    def respond( self ):
+        self.response.set( self.top.e.get() )
+        self.top.destroy()
+
+    def abort( self ):
+        self.response.set( 'ABORT' )
+        self.top.destroy()
+
+class ListDialog( Frame ):
+    def __init__( self, title, prompt, presets, master = None ):
+        super().__init__()
+        self.top = Toplevel()
+        self.top.title( title )
+        self.key = StringVar()
+
+        # parent frame geometry
+        w = 300 # width
+        h = 400 # height
+        x = self.master.winfo_screenwidth() # screen offset X
+        y = self.master.winfo_screenheight() # screen offset Y
+
+        x = int( ( x - w ) / 2 ) # center horizontal
+        y = int( ( y - h ) / 2 ) # center vertical
+        self.top.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
+
+        self.top.frame_list = Frame( self.top )
+        self.top.frame_list.pack( fill = BOTH, expand = True )
+
+        self.top.lbl_header = Label( self.top.frame_list, text = prompt )
+        self.top.lbl_header.pack( fill = X, padx = 5, expand = True)
+
+        self.top.button_grid = Frame( self.top, borderwidth = 1 )
+        self.top.button_grid.pack( fill = BOTH, expand = True )
+        self.top.btn_select = Button(
+            self.top,
+            text = 'Select',
+            command = self.set_key
+        )
+        self.top.btn_select.pack( side = LEFT, padx = 5, pady = 10 )
+        self.top.btn_back = Button(
+            self.top,
+            text = 'Back',
+            command = self.top.destroy
+        )
+        self.top.btn_back.pack( side = RIGHT, padx = 5, pady = 10 )
+
+        self.top.list = Listbox(
+            self.top.frame_list,
+            relief = SUNKEN,
+            background = '#FFF'
+        )
+        self.top.list.pack(
+            fill = BOTH,
+            padx = 5,
+            pady = ( 10, 5 ),
+            expand = True
+        )
+        for preset in presets:
+            self.top.list.insert( END, preset )
+
+    def set_key( self ):
+        self.key.set( self.top.list.get( ACTIVE ) )
+        self.top.destroy()
+
 if __name__ == '__main__':
+    savedata.Presets.load_pfile()
     root = Tk()
-    app = AppWindow()
+    app = Main()
     root.mainloop()
