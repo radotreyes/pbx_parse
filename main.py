@@ -139,7 +139,7 @@ class Main( Frame ):
             pady = 5
         )
         self.frame_preset_btn = Frame( self )
-        self.frame_preset_btn.pack( fill = X )
+        self.frame_preset_btn.pack( fill = BOTH )
         self.btn_load_preset = Button(
             self.frame_preset_btn,
             text = 'Load...',
@@ -155,21 +155,35 @@ class Main( Frame ):
 
         # Lower button grid
         self.button_grid = Frame( self, borderwidth = 0 )
-        self.button_grid.pack( fill = X, expand = True )
+        self.button_grid.pack(
+            side = BOTTOM,
+            fill = BOTH,
+            expand = True
+        )
+        self.btn_quit = Button(
+            self.button_grid,
+            text = 'Quit',
+            command = self.quit
+        )
+        self.btn_quit.pack(
+            side = RIGHT,
+            padx = 5,
+            pady = 5,
+            anchor = SE
+        )
 
         self.btn_start = Button(
             self.button_grid,
             text = 'Parse',
             command = self.parse
         )
-        self.btn_start.pack( side = LEFT, padx = 5, pady = 0 )
-
-        self.btn_quit = Button(
-            self.button_grid,
-            text = 'Quit',
-            command = self.quit
+        self.btn_start.pack(
+            side = RIGHT,
+            padx = 5,
+            pady = 5,
+            anchor = SE
         )
-        self.btn_quit.pack( side = RIGHT, padx = 5, pady = 0 )
+
 
     def init_UI_dynamic( self ):
         # initial dynamic UI states
@@ -198,10 +212,16 @@ class Main( Frame ):
 
         # update status display
         display_status = Label(
-            self,
+            self.button_grid,
             textvariable = self.status
         )
-        display_status.pack( fill = X, padx = 5, pady = 5 )
+        display_status.pack(
+            side = LEFT,
+            fill = X,
+            padx = 5,
+            pady = 5,
+            anchor = SW
+        )
 
         # update excel file display
         display_xlsx = Label(
@@ -340,9 +360,9 @@ class LongPrompt( Frame ):
 
         # parent frame geometry
         w = self.master.winfo_width() # width
-        h = self.master.winfo_height() # height
+        h = int( self.master.winfo_height() * .75 ) # height
         x = self.master.winfo_screenwidth() # screen offset X
-        y = self.master.winfo_screenheight() # screen offset Y
+        y = self.master.winfo_screenheight()  # screen offset Y
 
         x = int( ( x - w ) / 2 ) # center horizontal
         y = int( ( y - h ) / 2 ) # center vertical
@@ -380,6 +400,7 @@ class LongPrompt( Frame ):
             padx = 10,
             pady = 5,
         )
+        self.top.e.focus_set()
 
         self.top.button_grid = Frame( self.top, borderwidth = 1 )
         self.top.button_grid.pack()
@@ -389,6 +410,7 @@ class LongPrompt( Frame ):
             command = self.respond
         )
         self.top.btn_select.pack( side = LEFT, padx = 10, pady = 10 )
+        self.top.bind( '<Return>', self.respond )
         self.top.btn_back = Button(
             self.top,
             text = 'Abort Parsing',
@@ -396,7 +418,7 @@ class LongPrompt( Frame ):
         )
         self.top.btn_back.pack( side = RIGHT, padx = 10, pady = 10 )
 
-    def respond( self ):
+    def respond( self, event = None ):
         self.response.set( self.top.e.get() )
         self.top.destroy()
 

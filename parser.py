@@ -150,7 +150,9 @@ class Record():
         os.system( 'cls' if os.name == 'nt' else 'clear' )
         confirm( 'This program requires you to enter a "Primary Key" for the data set you wish to parse. A Primary Key is a unique data field that is present in every entry in a given data set.\n\nPlease note that Siemens PBX files may have multiple data sets in one file; you may be required to enter multiple Primary Keys for a given file.')
         while True:
-            pk = prompt( 'Please enter the Primary Key for this data set.\n\nNOTE: Make sure that the Primary Key you are entering is unique and present\nin each entry in this data set. If incorrect, this program will not work correctly.' )
+            pk = prompt( 'Please enter the Primary Key for the file {}.\n\nNOTE: Make sure that the Primary Key you are entering is unique and present\nin each entry in this data set. If incorrect, this program will not work correctly.'
+                .format( self.meta['name'] )
+            )
             if not pk or not re.search( r'\S', pk ):
                 if pk == None:
                     return False
@@ -235,13 +237,16 @@ class Record():
         if not self.presets:
             ''' UI '''
             os.system( 'cls' if os.name == 'nt' else 'clear' )
+            confirm(
+                'Please provide names for each field in the file "{}".\n\nAll fields must be properly named to store data from this raw file. If necessary, please browse through the raw file to determine appropriate names.'
+                .format( self.meta['name'] )
+            )
 
             x = offset = 0 # offset index, to be used if pk_inline is True
             for i, key in enumerate( self.structure['keys'] ):
                 x = i + offset
 
                 self.structure['field_names'].append( [] )
-
                 for j, cell in enumerate( self.structure['cells'][i] ):
                     if key != 'PRIMARY KEY':
                         ( f, l ) = cell
@@ -251,8 +256,6 @@ class Record():
                         message += '> ' + sample_data['entries'][x] + '\n'
                         message += '> ' + ' ' * int( f ) + '^' + '\n'
                         message += '> ' + ' ' * int( f ) + '^' + '\n'
-
-                        confirm( 'Please provide names for each field in the file "{}".\n\nAll fields must be properly named to store data from this raw file. If necessary, please browse through the raw file to determine appropriate names.'.format( self.meta['name'] ) )
 
                         while True:
                             lp = LongPrompt(
