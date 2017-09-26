@@ -3,6 +3,7 @@ from main import *
 prompt = lambda x: askstring( 'Input requred', x )
 confirm = lambda x: messagebox.showinfo( 'Confirm', x )
 choose = lambda x: messagebox.askquestion( 'Input required', x )
+update = lambda request, x: request.status.set( x )
 
 true = lambda x: True if x == True or x == 'yes' else False
 false = lambda x: True if x != True or x == False or x == None or x == 'no' else False

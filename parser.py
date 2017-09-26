@@ -3,7 +3,7 @@ from savedata import Presets
 from relay import *
 from main import *
 
-import re, os, json
+import re, os, json, sys
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Color, PatternFill
 
@@ -12,17 +12,14 @@ class RawFile():
         self.book = book
         self.name = os.path.split( path )[1].split( '.' )[0]
         self.request = Presets.request = request
+        update( self.request, 'Opening file {}...'.format( path ) )
 
         with open( path ) as file:
             self.content = file.readlines()
 
         self.records = self.get_records()
-
-        print( 'Found {} records in this file:'.format( len( self.records ) ) )
         if self.records:
             for key, value in self.records.items():
-                print( '\tRecord "{}" with length {}'.format( key, len( value ) ) )
-
                 self.process_record( key, value )
 
     def get_records( self ):
@@ -78,6 +75,7 @@ class Record():
 
     def __init__( self, name, rawdata, command, book, request ):
         # Open file
+        run = True
         self.raw = rawdata
         self.request = request
 
@@ -91,9 +89,13 @@ class Record():
                     use = input( '>> ' ).lower()
                 if true( use ):
                     pdata = Presets.get_pdata()
-                    self.meta = pdata['meta']
-                    self.structure = pdata['structure']
-                    self.presets = True
+                    if pdata:
+                        self.meta = pdata['meta']
+                        self.structure = pdata['structure']
+                        self.presets = True
+                    else:
+                        self.presets = True
+                        run = False
                     break
                 elif false( use ):
                     self.presets = False
@@ -111,44 +113,53 @@ class Record():
                 'pk_inline': False, # if the PK contains an inline data point
                 'command': command
             }
-            self.set_meta()
+        if run:
+            run = self.set_meta()
 
-            self.structure = {
-                'keys': [], # contains the line of data above each horizontal rule
-                            # used to verify uniqueness of each hrule pattern
-                'cells': [], # unique horizontal rule patterns in the file
-                'fix': [], # specifies if fields need to be align-fixed
-                'field_names': [], # user-defined field names
-                'set_ids': [], # integers corresponding 1:1 to a data pattern
-                'write_columns': [], # starting indices of grouped field names, 0ind
-            }
-        self.set_structure()
+        if run:
+            if not self.presets:
+                self.structure = {
+                    'keys': [], # contains the line of data above each horizontal rule
+                                # used to verify uniqueness of each hrule pattern
+                    'cells': [], # unique horizontal rule patterns in the file
+                    'fix': [], # specifies if fields need to be align-fixed
+                    'field_names': [], # user-defined field names
+                    'set_ids': [], # integers corresponding 1:1 to a data pattern
+                    'write_columns': [], # starting indices of grouped field names, 0ind
+                }
+            run = self.set_structure()
 
-        # Data object
-        self.data = {} # actually contains the data
+            if run:
+                # Data object
+                self.data = {} # actually contains the data
 
-        # Output worksheet
-        self.wb = { 'book': load_workbook( book ), 'path': book }
-        self.sheet = self.wb['book'].create_sheet( self.meta['name'] )
-
-        # Read the file and output to Excel
-        # TODO: Move to user control
-        self.scrape()
-        self.write()
-        ''' '''
+                # Output worksheet
+                self.wb = { 'book': load_workbook( book ), 'path': book }
+                self.sheet = self.wb['book'].create_sheet( self.meta['name'] )
+                self.scrape()
+                self.write()
+            else:
+                update( self.request, 'Ready' )
+        else:
+            update( self.request, 'Ready' )
 
     def __str__( self ):
         return 'Data file with name: ' + self.name
 
     def set_meta( self ):
         os.system( 'cls' if os.name == 'nt' else 'clear' )
+        confirm( 'This program requires you to enter a "Primary Key" for the data set you wish to parse. A Primary Key is a unique data field that is present in every entry in a given data set.\n\nPlease note that Siemens PBX files may have multiple data sets in one file; you may be required to enter multiple Primary Keys for a given file.')
         while True:
-            pk = prompt( 'Please enter the primary key for this data set.' )
+            pk = prompt( 'Please enter the Primary Key for this data set.\n\nNOTE: Make sure that the Primary Key you are entering is unique and present\nin each entry in this data set. If incorrect, this program will not work correctly.' )
             if not pk or not re.search( r'\S', pk ):
-                confirm( '\nPlease enter a non-blank name.\n' )
+                if pk == None:
+                    return False
+                else:
+                    confirm( '\nPlease enter a non-blank name.\n' )
             else:
                 break
         self.meta['pk'] = r'' + re.escape( pk )
+        return True
 
         os.system( 'cls' if os.name == 'nt' else 'clear' )
 
@@ -217,6 +228,9 @@ class Record():
                     sample_data['locs'].append( str( i ) )
                     sample_data['hrules'].append( self.raw[i] )
                     sample_data['entries'].append( self.raw[i+1] )
+        if not self.structure['cells'] or len( self.structure['keys'] ) != len( self.structure['cells'] ):
+            confirm( 'Couldn\'t process this file. Did you enter a valid Primary Key?' )
+            return False
 
         if not self.presets:
             ''' UI '''
@@ -262,9 +276,12 @@ class Record():
                         offset -= 1
 
                     self.structure['field_names'][i].append( name )
-                    print( '\n' )
-                    os.system( 'cls' if os.name == 'nt' else 'clear' )
             ''' /UI '''
+        update(
+            self.request, 'Scanning file {}...'
+                .format( self.meta['name']
+            )
+        )
 
         ''' SAVING PRESETS '''
         while True:
@@ -283,6 +300,7 @@ class Record():
                 confirm( 'Please enter a valid input.' )
 
         os.system( 'cls' if os.name == 'nt' else 'clear' )
+        return True
 
 
     def scrape( self ):
@@ -390,12 +408,11 @@ class Record():
 
                 c += 1 # number of times data has been pushed under one hrule
 
-        print( json.dumps( self.data, indent = 2) )
-
     def write( self ):
         '''
         Write the file to Excel.
         '''
+        update( self.request, 'Writing to workbook...' )
         flat_fields = [] # flattened list of field names for column assignment
         for group in self.structure['field_names']:
             for i, field in enumerate( group ):
@@ -415,6 +432,7 @@ class Record():
 
         ''' DEBUG'''
         confirm( 'Parsing finished.\nFile was saved to workbook {}.'.format( self.wb['path'] ) )
+        update( self.request, 'Ready' )
 
 class Scanner():
     @staticmethod
