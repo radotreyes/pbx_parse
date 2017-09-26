@@ -43,6 +43,7 @@ class Presets():
         '''
         # define the file path
         path = os.path.join( cls.cd, '{}.py'.format( name ) )
+        input( 'Creating preset in directory: {}'.format( path ) )
 
         # If the file exists, confirm if the user wants to overwrite
         if os.path.isfile( path ):
@@ -58,7 +59,7 @@ class Presets():
                 elif false( w ):
                     confirm( 'Didn\'t overwrite.' )
                     return False # stop trying to create a new file
-                print( '\nPlease enter a valid input.\n' )
+                confirm( '\nPlease enter a valid input.\n' )
 
         # change the current preset file path
         cls.ppath = path
@@ -72,6 +73,8 @@ class Presets():
         # load the new preset data
         Presets.load_pfile()
 
+        return path
+
     @classmethod
     def load_pfile( cls ):
         ''' Load preset data from an existing file. '''
@@ -82,13 +85,19 @@ class Presets():
         print( 'Loading presets from {} ...'.format( cls.ppath ) )
 
     @classmethod
-    def change_pfile( cls, name ):
+    def change_pfile( cls, path ):
         '''
         Load another preset file based on user input.
         IN: _name_, preset filename excluding extension.
         '''
         # define the file path
-        path = os.path.join( cls.cd, '{}.py'.format( name ) )
+        if not path.endswith( '.py' ):
+            path = os.path.join( cls.cd, '{}.py'.format( path ) )
+
+        if cls.cd in path:
+            name = path.split( cls.cd + '/' )[1].split( '.py' )[0]
+        else:
+            name = path.split( '.py' )[0]
 
         if not os.path.isfile( path ):
             # create the file if it doesn't exist
@@ -111,28 +120,12 @@ class Presets():
             preset_list = [ preset for preset in cls.pdata ]
             k = ListDialog( 'Load a preset', 'Please choose a preset:', preset_list )
             cls.request.wait_window( k.top )
-            # DEBUG
-            # input( 'Retrieving preset data from "{}"'.format( k.key.get() ) )
-            return cls.pdata[k.key.get()]
-
-            ''' moved this stuff from terminal to Tkinter '''
-            #
-            # while True:
-            #     key = input( 'Which preset do you want to load?\n>> ' )
-            #     ( 'Type \'exit\' to abort.' )
-            #     if not key or not re.search( r'\S', key ):
-            #         print( 'Please enter a valid name.' )
-            #     elif key.lower() == 'exit':
-            #         return False
-            #     else:
-            #         try:
-            #             if cls.pdata[key]:
-            #                 return cls.pdata[key]
-            #         except KeyError:
-            #             print( 'That preset doesn\'t exist!' )
-            ''' '''
+            try:
+                return cls.pdata[k.key.get()]
+            except KeyError:
+                return False
         else:
-            print( 'There are no presets here!' )
+            confirm( 'There are no presets here!' )
             return False
 
     @classmethod
@@ -158,12 +151,11 @@ class Presets():
                                 cls.pdata[key]['meta'] = meta
                                 cls.pdata[key]['structure'] = structure
                                 Presets.save_pdata()
-                                # print( json.dumps( cls.pdata, indent = 2 ) )
+
                                 return False # exit the function
                             elif false( w ):
                                 confirm( 'Didn\'t overwrite.' )
                                 break
-                            # print( '\nPlease enter a valid input.\n' )
                 except KeyError:
                     # the preset doesn't already exist, so create it
                     cls.pdata[key] = {}

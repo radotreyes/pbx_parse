@@ -15,45 +15,12 @@ from tkinter.ttk import Frame, Button, Style, Label, Entry
 from tkinter.filedialog import askopenfilename, asksaveasfile, askdirectory
 from tkinter.simpledialog import askstring
 
-import os, re
+import os, re, sys
 import parser, settings, savedata
+from relay import *
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Color, PatternFill
-
-class AuxList( Frame ):
-    def __init__( self, title, list, master = None ):
-        super().__init__()
-
-        # parent frame geometry
-        w = 150 # width
-        h = 300 # height
-        x = self.master.winfo_screenwidth() # screen offset X
-        y = self.master.winfo_screenheight() # screen offset Y
-
-        x = int( ( x - w ) / 2 ) # center horizontal
-        y = int( ( y - h ) / 2 ) # center vertical
-        self.master.geometry( '{}x{}+{}+{}'.format( w, h, x, y ) )
-
-        self.master.title( title )
-        self.pack( fill = BOTH, expand = 1 )
-
-        self.style = Style()
-        self.style.theme_use( 'clam' ) # default theme for now
-
-        self.frame_list = Frame( self )
-        self.frame_list.pack( fill = X )
-        self.list = Listbox( self.frame_list,
-            relief = SUNKEN,
-            background = '#FFF' )
-        self.list.pack( side = TOP, fill = X, padx = 5, pady = ( 10, 5 ), expand = True )
-
-        self.button_grid = Frame( self, borderwidth = 1 )
-        self.button_grid.pack( fill = BOTH, expand = True )
-        self.btn_start = Button( self, text = 'Select', command = None )
-        self.btn_start.pack( side = LEFT, padx = 5, pady = 10 )
-        self.btn_quit = Button( self, text = 'Back', command = None )
-        self.btn_quit.pack( side = RIGHT, padx = 5, pady = 10 )
 
 class Main( Frame ):
     def __init__( self ):
@@ -93,47 +60,116 @@ class Main( Frame ):
         # Data File
         self.frame_data = Frame( self )
         self.frame_data.pack( fill = X )
-        self.lbl_data = Label( self.frame_data, text = 'Data Files:', width = 12, relief = FLAT )
-        self.lbl_data.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
-
+        self.lbl_data = Label(
+            self.frame_data,
+            text = 'Data Files:',
+            width = 12,
+            relief = FLAT
+        )
+        self.lbl_data.pack(
+            side = LEFT,
+            ipadx = 5,
+            padx = 5,
+            ipady = 5,
+            pady = 5
+        )
         self.frame_data_btn = Frame( self )
         self.frame_data_btn.pack( fill = X )
-        btn_rm_data = Button( self.frame_data_btn, text = 'Remove', command = self.rm_data )
-        btn_rm_data.pack( side = RIGHT, padx = 5 )
-        btn_add_data = Button( self.frame_data_btn, text = 'Add', command = self.set_data )
-        btn_add_data.pack( side = RIGHT, padx = 5 )
+        self.btn_rm_data = Button(
+            self.frame_data_btn,
+            text = 'Remove',
+            command = self.rm_data
+        )
+        self.btn_rm_data.pack( side = RIGHT, padx = 5 )
+        self.btn_add_data = Button(
+            self.frame_data_btn,
+            text = 'Add',
+            command = self.set_data
+        )
+        self.btn_add_data.pack( side = RIGHT, padx = 5 )
 
         # Excel Workbook
         self.frame_xlsx = Frame( self )
         self.frame_xlsx.pack( fill = X, pady = ( 10, 0 ) )
-        self.lbl_xlsx = Label( self.frame_xlsx, text = 'Workbook:', width = 12, relief = FLAT )
-        self.lbl_xlsx.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
+        self.lbl_xlsx = Label(
+            self.frame_xlsx,
+            text = 'Workbook:',
+            width = 12,
+            relief = FLAT
+        )
+        self.lbl_xlsx.pack(
+            side = LEFT,
+            ipadx = 5,
+            padx = 5,
+            ipady = 5,
+            pady = 5
+        )
         self.frame_xlsx_btn = Frame( self )
         self.frame_xlsx_btn.pack( fill = X )
-        btn_load_wb = Button( self.frame_xlsx_btn, text = 'Load...', command = self.set_wb )
-        btn_load_wb.pack( side = RIGHT, padx = 5 )
-        btn_new_wb = Button( self.frame_xlsx_btn, text = 'New...', command = lambda: self.set_wb( True ) )
-        btn_new_wb.pack( side = RIGHT, padx = 5 )
+        self.btn_load_wb = Button(
+            self.frame_xlsx_btn,
+            text = 'Load...',
+            command = self.set_wb
+        )
+        self.btn_load_wb.pack( side = RIGHT, padx = 5 )
+        self.btn_new_wb = Button(
+            self.frame_xlsx_btn,
+            text = 'New...',
+            command = lambda: self.set_wb( True )
+        )
+        self.btn_new_wb.pack( side = RIGHT, padx = 5 )
 
         # Presets File
         self.frame_preset = Frame( self )
-        self.frame_preset.pack( fill = X, pady = ( 10, 0 ) )
-        self.lbl_preset = Label( self.frame_preset, text = 'Presets File:', width = 12, relief = FLAT )
-        self.lbl_preset.pack( side = LEFT, ipadx = 5, padx = 5, ipady = 5, pady = 5 )
+        self.frame_preset.pack(
+            fill = X,
+            pady = ( 10, 0 )
+        )
+        self.lbl_preset = Label(
+            self.frame_preset,
+            text = 'Presets File:',
+            width = 12,
+            relief = FLAT
+        )
+        self.lbl_preset.pack(
+            side = LEFT,
+            ipadx = 5,
+            padx = 5,
+            ipady = 5,
+            pady = 5
+        )
         self.frame_preset_btn = Frame( self )
         self.frame_preset_btn.pack( fill = X )
-        btn_preset = Button( self.frame_preset_btn, text = 'Choose...', command = self.set_preset )
-        btn_preset.pack( side = RIGHT, padx = 5)
+        self.btn_load_preset = Button(
+            self.frame_preset_btn,
+            text = 'Load...',
+            command = self.set_preset
+        )
+        self.btn_load_preset.pack( side = RIGHT, padx = 5)
+        self.btn_new_preset = Button(
+            self.frame_preset_btn,
+            text = 'New...',
+            command = lambda: self.set_preset( True )
+        )
+        self.btn_new_preset.pack( side = RIGHT, padx = 5 )
 
         # Lower button grid
-        button_grid = Frame( self, borderwidth = 1 )
-        button_grid.pack( fill = BOTH, expand = True )
+        self.button_grid = Frame( self, borderwidth = 0 )
+        self.button_grid.pack( fill = X, expand = True )
 
-        self.btn_start = Button( self, text = 'Parse', command = self.parse )
-        self.btn_start.pack( side = LEFT, padx = 5, pady = 10 )
+        self.btn_start = Button(
+            self.button_grid,
+            text = 'Parse',
+            command = self.parse
+        )
+        self.btn_start.pack( side = LEFT, padx = 5, pady = 0 )
 
-        btn_quit = Button( self, text = 'Quit', command = self.quit )
-        btn_quit.pack( side = RIGHT, padx = 5, pady = 10 )
+        self.btn_quit = Button(
+            self.button_grid,
+            text = 'Quit',
+            command = self.quit
+        )
+        self.btn_quit.pack( side = RIGHT, padx = 5, pady = 0 )
 
     def init_UI_dynamic( self ):
         # initial dynamic UI states
@@ -144,31 +180,50 @@ class Main( Frame ):
         self.preset_files = StringVar()
         self.preset_files.set( '{}'.format( self.preset_file ) )
 
+        self.status = StringVar()
+        update( self, 'Ready' )
+
         print( 'Running' )
         # update data file display
         self.display_data = Listbox( self.frame_data,
             relief = SUNKEN,
             background = '#FFF' )
-        self.display_data.pack( side = TOP, fill = X, padx = 5, pady = ( 10, 5 ), expand = True )
+        self.display_data.pack(
+            side = TOP,
+            fill = X,
+            padx = 5,
+            pady = ( 10, 5 ),
+            expand = True
+        )
+
+        # update status display
+        display_status = Label(
+            self,
+            textvariable = self.status
+        )
+        display_status.pack( fill = X, padx = 5, pady = 5 )
 
         # update excel file display
-        display_xlsx = Label( self.frame_xlsx,
+        display_xlsx = Label(
+            self.frame_xlsx,
             textvariable = self.wb_files,
             relief = SUNKEN,
-            background = '#FFF' )
+            background = '#FFF'
+        )
         display_xlsx.pack( fill = X, padx = 5, expand = True )
 
         # update preset file display
-        display_preset = Label( self.frame_preset,
+        display_preset = Label(
+            self.frame_preset,
             textvariable = self.preset_files,
             relief = SUNKEN,
-            background = '#FFF' )
+            background = '#FFF'
+        )
         display_preset.pack( fill = X, padx = 5, expand = True )
 
     def parse( self ):
         ''' Execute the parser '''
         for f in self.files_to_parse:
-            print( 'PARSING:\n\tDATA FILE: {}\n\tWORKBOOK: {}'.format( f, self.wb_file ) )
             parser.RawFile( f, self.wb_file, self )
 
     def set_parse( self ):
@@ -261,9 +316,18 @@ class Main( Frame ):
         self.wb_files.set( '{}'.format( self.wb_file ) )
         self.set_parse()
 
-    def set_preset( self ):
-        ftypes = [ ( 'Python files', '*.py' ) ]
-        self.preset_file = askopenfilename( filetypes = ftypes )
+    def set_preset( self, new = False ):
+        if new:
+            f = askstring(
+                title = 'Create a new preset file',
+                prompt = 'Enter a name for the new preset file. (Exclude the file extension)'
+            )
+            self.preset_file = savedata.Presets.new_pfile( f )
+        else:
+            ftypes = [ ( 'Python files', '*.py' ) ]
+            self.preset_file = askopenfilename( filetypes = ftypes )
+
+        savedata.Presets.change_pfile( self.preset_file )
         self.preset_files.set( '{}'.format( self.preset_file ) )
         self.set_parse()
 
@@ -291,7 +355,10 @@ class LongPrompt( Frame ):
             pady = 5
         )
 
-        self.top.lbl_header = Label( self.top.frame_display, text = prompt )
+        self.top.lbl_header = Label(
+            self.top.frame_display,
+            text = prompt
+        )
         self.top.lbl_header.pack( fill = X, padx = 5, expand = True )
         self.top.display = Label(
             self.top.frame_display,
