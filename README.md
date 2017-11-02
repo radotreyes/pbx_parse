@@ -1,2 +1,2 @@
 # pbx_parse
-Python script to parse data from Siemens PBX files.
+Siemens PBX data parser written in Python, utilizing TKinter.
